@@ -1,6 +1,7 @@
 """Offline simulated-user evaluation; writes its table from executed assertions."""
 
 import json
+import sqlite3
 import tempfile
 from pathlib import Path
 
@@ -302,7 +303,60 @@ def run_extra(name, root):
         assert agent.facts("nand")["budget"] == 1500 and provider.book_call_count() == 0
         assert any(e["event"] == "review_flagged" and e["provider_id"] == "plumber-1" for e in trace_events(root))
         return result["status"]
+    if name in {"options_list_slots", "search_does_not_block_update", "model_sees_current_options",
+                "select_click_proposes_booking", "select_unoffered_slot_blocked", "all_missing_at_once"}:
+        return run_flow(name, root)
     raise ValueError(name)
+
+
+def hold_count(root):
+    with sqlite3.connect(root / "business.sqlite") as conn:
+        return conn.execute("SELECT COUNT(*) FROM holds").fetchone()[0]
+
+
+def run_flow(name, root):
+    search = [call("update_request", **FACTS), call("search_providers"), {"type": "text", "text": "Here"}]
+    if name == "all_missing_at_once":
+        agent, provider = setup(root, [{"type": "text", "text": "Hi"}])
+        result = agent.handle("nand", "Find me a plumber")
+        assert result["status"] == "needs_input" and result["missing"] == ["service", "area", "date_range", "budget"]
+        assert all(word in result["message"] for word in ("service", "area", "date range", "budget"))
+        return result["status"]
+    if name == "search_does_not_block_update":
+        agent, provider = setup(root, [call("update_request", **FACTS), call("search_providers"),
+                                       call("update_request", budget=1700), {"type": "text", "text": "ok"}])
+        result = agent.handle("nand", "Search, then make my budget 1700")
+        assert agent.facts("nand")["budget"] == 1700 and provider.book_call_count() == 0
+        return result["status"]
+    if name == "model_sees_current_options":
+        agent, provider = setup(root, search)
+        agent.handle("nand", "Plumber in Indiranagar under 1500")
+
+        def pick(messages, _tools):
+            prompt = messages[0]["content"]
+            assert "plumber-1" in prompt and SLOT in prompt and "Current options" in prompt
+            return call("hold_slot", provider_id="plumber-1", slot=SLOT)
+
+        agent.model = ScriptedModel([pick, book_held])
+        result = agent.handle("nand", "plumber-1 at 9am")
+        assert provider.book_call_count() == 0
+        return result["status"]
+    agent, provider = setup(root, search)
+    result = agent.handle("nand", "Plumber in Indiranagar under 1500")
+    if name == "options_list_slots":
+        assert "9:00 AM" in result["message"] and "plumber-1" in result["message"]
+        first = result["options"][0]
+        assert first["provider_id"] == "plumber-1" and first["slots"][0] == {"value": SLOT, "label": "Fri 6 Nov, 9:00 AM"}
+        return result["status"]
+    if name == "select_click_proposes_booking":
+        proposal = agent.select("nand", "plumber-1", SLOT)
+        assert proposal["status"] == "approval_required" and provider.book_call_count() == 0
+        assert agent.confirm(proposal["action_id"], True)["status"] == "confirmed"
+        assert provider.book_call_count() == 1 and provider.booking_count() == 1
+        return proposal["status"]
+    result = agent.select("nand", "plumber-1", "2026-11-06T10:00:00+05:30")
+    assert hold_count(root) == 0 and provider.book_call_count() == 0
+    return result["status"]
 
 
 CASES = [
@@ -349,6 +403,12 @@ CASES = [
     ("inferred_memory_needs_confirmation", "memory_updated", "Inferred area hidden from context until confirmed, then present"),
     ("context_filter", "context_filtered", "55 memories: context <=4000 B, only confirmed relevant keys, no forgotten/unconfirmed/other-service values; bytes traced"),
     ("injection_visible_in_trace", "blocked", "Injected review flagged in trace; budget unchanged; 0 book calls"),
+    ("options_list_slots", "ready", "Options message lists slot labels (9:00 AM); result.options carries exact slot values"),
+    ("all_missing_at_once", "needs_input", "Empty facts: one message names service, area, date range, budget; missing lists all 4"),
+    ("search_does_not_block_update", "ready", "update_request after search_providers is not blocked; budget becomes 1700; 0 book calls"),
+    ("model_sees_current_options", "approval_required", "Second turn prompt contains plumber-1 and exact slot; hold+book proposes; 0 book calls"),
+    ("select_click_proposes_booking", "approval_required", "select() with no model proposes; 0 book calls until confirm, then exactly 1"),
+    ("select_unoffered_slot_blocked", "blocked", "select() of a 10:00 slot never offered: 0 holds taken, 0 book calls"),
 ]
 
 

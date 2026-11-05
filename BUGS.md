@@ -75,3 +75,12 @@ A separate read-only reviewer reproduced these in a throwaway copy; each was fix
 - **Slot matching ignored the timezone offset.** `…09:00:00Z` held the `+05:30` slot. Fix: when the model gives an offset, it must equal the offered one.
 - **Simulated provider cancellation could orphan a pending approval.** Fix: refuse with 409 while an action awaits approval.
 - **Forgetting a preference before it was inferred did not stop the inference.** Fix: `forget` stores a tombstone row.
+
+## 16–18. Failures found by typing real requests through the live model
+
+Offline scenarios use a scripted model, so these only appeared with Claude in the loop. After the fixes, the same six requests all pass live.
+
+- **Booking from the options failed.** The model sometimes called `update_request` to "pin" the chosen time, or added a free-text preferences note. Either changed the request facts, which discarded the current options, so `hold_slot` answered "slot not in the current search results" and cancel and reschedule never started. Fix: free-text preferences no longer discard options, and the prompt and tool description say never to call `update_request` just to pick an option. A real change to area, date, budget, service or time bounds still discards the options on purpose.
+- **"Remember that I never want appointments before 10am" saved nothing.** The model did not know which key to use. Fix: the `memory_action` description names the keys (`global.earliest_time` as `HH:MM`, `global.preferred_area`, `<service>.technician`).
+- **"Same electrician as last time" looked in saved memory instead of booking history.** Fix: the `list_bookings` description and the prompt say "last time" and "my booking" mean booking history.
+- **Regression:** `tests/test_core_flow.py::test_free_text_preferences_do_not_discard_the_current_options` and `::test_tool_descriptions_steer_the_model_away_from_live_misroutes`, plus a repeat of the six live checks.

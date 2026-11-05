@@ -5,7 +5,9 @@ from urllib.request import Request, urlopen
 
 import pytest
 
+from errand.evals import FACTS, SLOT, call
 from errand.gate import MockBookingProvider
+from errand.model import ScriptedModel
 from errand.web import PAGE, create_server
 
 
@@ -22,7 +24,7 @@ def test_local_page_shows_trace_and_requires_matching_approval(tmp_path):
 
     try:
         with urlopen(base) as response:
-            assert b"Execution trace" in response.read()
+            assert b"What the assistant is doing" in response.read()
         proposal = post("/chat", {"text": "Book plumber-1 on Friday morning under 1500"})
         assert proposal["status"] == "approval_required"
         with urlopen(base + "/trace") as response:
@@ -111,6 +113,69 @@ def test_simulate_cancel_cancels_provider_side_and_waits_for_approval(tmp_path):
         stop()
 
 
-def test_page_has_cancel_button_and_no_innerhtml():
-    assert "Simulate provider cancellation" in PAGE
-    assert "innerHTML" not in PAGE
+def test_page_has_new_strings_and_no_innerhtml():
+    for text in ["How this works", "I never book without your yes", "Pretend the provider cancels my booking",
+                 "What the assistant is doing", "Show technical detail", "Yes, book it", "No, don't",
+                 "Searched and found", "Flagged a risky review and ignored it", "Held the slot for 10 minutes",
+                 "The provider didn't answer in time", "Hold expired: new hold, new approval needed",
+                 "SAFETY = a guardrail acted", "/select", "id=\"simcancel\"", "id=\"approve\"", "id=\"deny\""]:
+        assert text in PAGE, text
+    assert "innerHTML" not in PAGE and "insertAdjacentHTML" not in PAGE
+
+
+def _ready_server(tmp_path):
+    steps = [call("update_request", **FACTS), call("search_providers"), {"type": "text", "text": "Ready"}]
+    server = create_server(tmp_path, scripted=True, scenario="success", port=0, model=ScriptedModel(steps))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def req(path, data=None, headers=None):
+        request = Request(base + path, None if data is None else json.dumps(data).encode(),
+                          {"Content-Type": "application/json", **(headers or {})})
+        with urlopen(request) as response:
+            return json.load(response)
+
+    def stop():
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+    return req, stop
+
+
+def test_select_flow_books_exactly_once_and_pending_is_structured(tmp_path):
+    req, stop = _ready_server(tmp_path)
+    try:
+        assert req("/pending") == {"has_confirmed": False}
+        ready = req("/chat", {"text": "plumber"})
+        assert ready["status"] == "ready" and ready["options"][0]["slots"][0]["label"]
+        option = ready["options"][0]
+        proposal = req("/select", {"provider_id": option["provider_id"], "slot": option["slots"][0]["value"]})
+        assert proposal["status"] == "approval_required"
+        pending = req("/pending")
+        assert pending["has_confirmed"] is False and pending["action_id"] == proposal["action_id"]
+        assert pending["proposal"] == {"action": "book", "provider_id": option["provider_id"],
+                                       "slot": option["slots"][0]["value"],
+                                       "slot_label": option["slots"][0]["label"], "price": option["price"]}
+        assert "hold_id" not in json.dumps(pending)
+        with pytest.raises(HTTPError) as error:
+            req("/select", {"provider_id": option["provider_id"], "slot": option["slots"][0]["value"]})
+        assert error.value.code == 409 and json.load(error.value) == {"error": "resolve the pending action first"}
+        assert req("/approve", {"action_id": proposal["action_id"], "approved": True})["status"] == "confirmed"
+        assert req("/pending")["has_confirmed"] is True
+        provider = MockBookingProvider(tmp_path / "business.sqlite", user_id="demo")
+        assert [b["status"] for b in provider.list_bookings("demo")] == ["confirmed"]
+    finally:
+        stop()
+
+
+def test_select_rejects_bad_types_and_foreign_origin(tmp_path):
+    req, stop = _ready_server(tmp_path)
+    try:
+        for body in [{"provider_id": 1, "slot": "x"}, {"provider_id": "plumber-1"}, {"provider_id": "a", "slot": None}]:
+            with pytest.raises(HTTPError) as error:
+                req("/select", body)
+            assert error.value.code == 400
+        with pytest.raises(HTTPError) as error:
+            req("/select", {"provider_id": "plumber-1", "slot": SLOT}, {"Origin": "http://evil.example"})
+        assert error.value.code == 403
+    finally:
+        stop()
