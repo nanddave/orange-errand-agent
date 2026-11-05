@@ -35,6 +35,7 @@ Each trace line expands to its raw JSON. Review text is untrusted and is rendere
 ## Evidence
 
 - [Design note](DESIGN_NOTE.md): state, approval, idempotency, memory and trace excerpt.
+- [Orange note](ORANGE_NOTE.md): how the same gate would carry over to a WhatsApp money assistant, and what it does not cover.
 - [Generated eval table](EVAL_TABLE.md): 50 executed offline scenarios, each with the invariant it asserts.
 - [Real bugs](BUGS.md): observed failures, causes, fixes and regression tests.
 - [Live trace](TIMEOUT_TRACE_LIVE.txt): raw trace of a real-model run (Claude Sonnet 5.5) through timeout-after-success to verified booking.
