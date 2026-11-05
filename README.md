@@ -64,3 +64,4 @@ Before sharing this folder, remove `.env` or share the repository with `git clon
 - Live-model replies take about 10–20 seconds because the model makes several tool calls in turn.
 - Model picks can still vary between runs; code checks every tool argument, so a wrong pick is blocked or asks again rather than booking.
 - Cost figures are estimates from assumed per-token rates.
+- `errand/agent.py` is the largest file (about 530 lines; one 178-line method runs the chat loop). A split into tools, prompt, validation and approval modules is planned but deliberately not done before submission, because the tests, evals, fuzz report and recorded cassette all pin its behaviour.

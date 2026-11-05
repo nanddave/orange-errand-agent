@@ -1,6 +1,6 @@
 # Orange Errand Agent — project initiation document
 
-**Status:** Implementation complete on 5 November 2026: 143 tests and 50 offline evals pass, and a real-model run through timeout-after-success is saved as `TIMEOUT_TRACE_LIVE.txt`. The recorded demo, the AI-assistant transcript and submission remain open. No submission has begun.
+**Status:** Implementation complete on 5 November 2026: 149 tests and 50 offline evals pass, and a real-model run through timeout-after-success is saved as `TIMEOUT_TRACE_LIVE.txt`. The recorded demo, the AI-assistant transcript and submission remain open. No submission has begun.
 **Source of truth:** [Orange_Engineering_Assignment.pdf](/Users/nanddave/Downloads/Orange_Engineering_Assignment.pdf), three pages. The hiring email deadline is 7 November, 11:30 AM IST (confirmed by the user on 5 November 2026).
 **Objective:** Build a locally runnable, chat-based home-service agent that uses a real LLM, mock providers, explicit approval, and verified recovery from uncertain tool outcomes. Supply the exact evidence requested in the PDF.
 

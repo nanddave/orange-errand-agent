@@ -91,3 +91,8 @@ Offline scenarios use a scripted model, so these only appeared with Claude in th
 - **Cause:** LangGraph replays the earlier cached resume value (`approved: True`) when the same interrupt is resumed again, so the decline never reached the ledger.
 - **Fix:** a "no" on a proposed action is written to the ledger directly and never goes through the graph.
 - **Regression:** `tests/test_review_fixes.py::test_a_changed_action_can_still_be_declined`.
+
+## 20–21. Two page defects found by clicking through the demo
+
+- **Approval buttons and message box clipped at a normal laptop window height.** At about 600 px of window height the approval card pushed past the bottom of the chat panel, so "Yes, book it" was cut off and the input was hidden. Cause: the message list had a 300 px minimum height inside a fixed-height, overflow-hidden panel. Fix: the list now has a 140 px minimum and the app a 640 px minimum height, so the card and input always fit and the list scrolls. Regression: `tests/test_web.py::test_chat_body_leaves_room_for_the_approval_card_and_input` (a layout check by string; the visual result was confirmed in the browser).
+- **"Last run: waiting" after a pick or approve.** The run summary read the newest run, which had no model call, so it showed "waiting" even after a real run. Fix: it now uses the latest run that had a model call. This is page JavaScript that pytest cannot execute, so it was verified in the browser, not by a unit test.

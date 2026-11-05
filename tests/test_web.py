@@ -222,3 +222,90 @@ def test_select_rejects_bad_types_and_foreign_origin(tmp_path):
         assert error.value.code == 403
     finally:
         stop()
+
+
+def test_pending_kind_and_replacement_context_and_bookings(tmp_path):
+    req, stop = _ready_server(tmp_path)
+    try:
+        assert req("/bookings") == {"bookings": []}
+        ready = req("/chat", {"text": "plumber"})
+        option = ready["options"][0]
+        proposal = req("/select", {"provider_id": option["provider_id"], "slot": option["slots"][0]["value"]})
+        pending = req("/pending")
+        assert pending["kind"] == "booking" and "replaces" not in pending
+        assert req("/approve", {"action_id": proposal["action_id"], "approved": True})["status"] == "confirmed"
+        listed = req("/bookings")["bookings"]
+        assert len(listed) == 1 and set(listed[0]) == {"id", "provider", "slot_label", "price", "status"}
+        assert listed[0]["provider"] == option["provider_id"].replace("-", " ").title()
+        assert listed[0]["slot_label"] == option["slots"][0]["label"] and listed[0]["price"] == option["price"]
+        assert listed[0]["status"] == "confirmed"
+        result = req("/simulate-provider-cancel", {})
+        assert result["status"] == "approval_required"
+        assert req("/bookings")["bookings"][0]["status"] == "cancelled"
+        pending = req("/pending")
+        assert pending["kind"] == "replacement" and pending["action_id"] == result["action_id"]
+        assert pending["replaces"] == {"provider": listed[0]["provider"], "slot_label": listed[0]["slot_label"]}
+    finally:
+        stop()
+
+
+def test_bookings_takes_no_lock_while_chat_is_in_flight(tmp_path):
+    started, release = threading.Event(), threading.Event()
+
+    def slow(messages, tools):
+        started.set()
+        release.wait(10)
+        return {"type": "text", "text": "Hello"}
+
+    server = create_server(tmp_path, scripted=True, port=0, model=ScriptedModel([slow]))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    request = Request(base + "/chat", json.dumps({"text": "plumber"}).encode(), {"Content-Type": "application/json"})
+    worker = threading.Thread(target=lambda: urlopen(request, timeout=15).read(), daemon=True)
+    try:
+        worker.start()
+        assert started.wait(5)
+        with urlopen(base + "/bookings", timeout=1) as response:
+            assert json.load(response) == {"bookings": []}
+    finally:
+        release.set()
+        worker.join(timeout=10)
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+
+def test_page_has_hero_cards_bookings_strip_and_storage():
+    for text in ["approval-card", "confirm-card", "Nothing is booked until you click Yes.", "Your bookings",
+                 "sessionStorage", "Watch the assistant work here", "Approve a replacement?",
+                 "Replacement waiting for your yes", "Booked. One booking, verified.", "/bookings",
+                 "nothing was booked twice"]:
+        assert text in PAGE, text
+    assert "innerHTML" not in PAGE and "insertAdjacentHTML" not in PAGE
+
+
+def test_page_javascript_parses(tmp_path):
+    import re, shutil, subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    script = re.search(r"<script>(.*)</script>", PAGE, re.S).group(1)
+    path = tmp_path / "page.js"
+    path.write_text(script)
+    try:
+        assert subprocess.run([node, "--check", str(path)], capture_output=True, text=True).returncode == 0
+    finally:
+        path.unlink()
+
+
+def test_page_visual_identity_and_offline():
+    for text in [":focus-visible", "prefers-reduced-motion", "--accent:", "Book home services. You approve every step.",
+                 "<title>Orange Errand Agent</title>", "Orange Errand Agent"]:
+        assert text in PAGE, text
+    assert "https://" not in PAGE and "//cdn" not in PAGE and "fonts.googleapis" not in PAGE
+    assert "@import" not in PAGE and "<link" not in PAGE and "src=" not in PAGE
+
+
+def test_chat_body_leaves_room_for_the_approval_card_and_input():
+    from errand.web import PAGE
+
+    assert "min-height:140px" in PAGE and "min-height:300px" not in PAGE

@@ -17,16 +17,82 @@ from errand.model import AnthropicModel, RecordingModel, ReplayModel, ScriptedMo
 
 PAGE = r"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Orange Errand Agent</title><style>
-body{font:15px system-ui,sans-serif;margin:0;background:#f7f8fa;color:#17212b}header{background:#fff;border-bottom:1px solid #ddd;padding:16px 24px}h1{font-size:20px;margin:0}main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;height:calc(100vh - 150px);box-sizing:border-box}section{display:flex;flex-direction:column;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden;min-height:0}h2{font-size:15px;margin:0;padding:14px;border-bottom:1px solid #eee}.body{padding:16px;overflow:auto;flex:1;white-space:pre-wrap}.bubble{padding:10px 13px;border-radius:10px;margin:0 0 10px;max-width:90%}.you{background:#e9f1fb;margin-left:auto}.agent{background:#fff3e7}[hidden]{display:none!important}form,.actions{display:flex;gap:8px;padding:12px;border-top:1px solid #eee}.actions{flex-wrap:wrap}#proposal{width:100%;white-space:pre-wrap}input[type=text]{flex:1;padding:10px;font:inherit}button{padding:10px 14px;background:#e67722;color:white;border:0;border-radius:7px;cursor:pointer}button.secondary{background:#596675}button:disabled{opacity:.5;cursor:default}pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;padding:8px;background:#f5f6f8;border-radius:5px}.ev{white-space:normal;margin:0 0 6px;font-size:13px;word-break:break-word}.ev summary{cursor:pointer}.ev.red{color:#b42318}.ev.green{color:#067647}.ev.amber{color:#b54708}.tag{font-weight:700;font-size:11px;margin-right:6px}.how{background:#fff3e7;padding:8px 24px;font-size:13px;border-bottom:1px solid #eee}.legend{font-size:12px;color:#596675;padding:8px 14px;border-bottom:1px solid #eee}.choices{white-space:normal;margin:0 0 10px}.choices .card{border:1px solid #ddd;border-radius:8px;padding:8px;margin:0 0 8px}.choices button{margin:4px 6px 0 0}.top{display:flex;justify-content:space-between;align-items:center}.cap{font-size:12px;color:#596675;margin:4px 0 0}@media(max-width:750px){main{grid-template-columns:1fr;height:auto}section{height:45vh}}
-</style><header><div class="top"><h1>Orange Errand Agent · local demo</h1><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="actions" class="actions" hidden><div id="proposal"></div><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked with the provider · UNCERTAIN = outcome not known yet<br><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
+:root{--bg:#fbf7f2;--surface:#fff;--ink:#1f2933;--muted:#52606d;--line:#e4ddd3;--accent:#c2410c;--accent-strong:#9a3412;--accent-tint:#fff0e6;--accent-fill:#ffe3d1;--ok:#1a6b3c;--ok-tint:#e6f4ea;--warn:#8a4b00;--warn-tint:#fff3d6;--bad:#9b1c1c;--bad-tint:#fde8e8;--info-tint:#e8eef5;--shadow:0 1px 3px rgba(31,41,51,.08),0 4px 12px rgba(31,41,51,.05)}
+*{box-sizing:border-box}
+body{font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:28px;height:28px;border-radius:50%;background:var(--accent);box-shadow:inset 0 0 0 6px var(--accent-fill),inset 0 0 0 9px var(--accent);flex:none}
+h1{font-size:20px;font-weight:600;line-height:1.25;margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-strong);background:var(--accent-tint);border:1px solid var(--accent-fill);border-radius:999px;padding:1px 8px}
+.tagline{margin:0;font-size:13px;color:var(--muted)}
+.how{background:var(--accent-tint);border-bottom:1px solid var(--accent-fill);padding:8px 0;font-size:13px;color:var(--ink)}
+main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;max-width:1200px;margin:0 auto;height:calc(100vh - 170px);min-height:640px}
+section{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;min-height:0}
+h2{font-size:15px;font-weight:600;margin:0;padding:12px 16px;border-bottom:1px solid var(--line)}
+.body{padding:16px;overflow:auto;flex:1;min-height:140px;white-space:pre-wrap}
+[hidden]{display:none!important}
+.bubble{padding:10px 14px;border-radius:14px;margin:0 0 10px;max-width:85%;width:fit-content;overflow-wrap:anywhere}
+.you{background:var(--accent-fill);margin-left:auto;border-bottom-right-radius:4px}
+.agent{background:#f1f3f5;border-bottom-left-radius:4px}
+form,.actions{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.actions{flex-wrap:wrap}
+#actions.approval-card{flex-direction:column;border:2px solid var(--accent);margin:12px;border-radius:12px;background:var(--accent-tint);max-height:45%;overflow:auto;flex:none}
+.approval-card h3,.confirm-card h3{margin:0 0 8px;font-size:16px;font-weight:600}
+.rrow{display:flex;gap:8px;align-items:baseline}
+.rrow .lbl{width:70px;color:var(--muted);font-size:13px;flex:none}
+.rrow .val{font-weight:600}
+.approval-card .rrow:nth-of-type(n+2) .val{font-size:20px}
+.note{margin:8px 0 0;color:var(--muted);font-size:13px}
+.bar{display:flex;gap:8px;flex-wrap:wrap}
+.confirm-card{white-space:normal;border:2px solid var(--ok);border-radius:12px;background:var(--ok-tint);padding:12px 14px;margin:0 0 10px;max-width:90%}
+.confirm-card h3{color:var(--ok)}
+.confirm-card .hl{background:var(--warn-tint);color:var(--ink);padding:6px 8px;border-radius:6px;margin:8px 0 0;font-size:13px}
+#bookings{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);max-height:96px;overflow:auto}
+#bookings .chipb{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:2px 10px;font-size:13px}
+#bookings .chipb.dashed{border-style:dashed}
+.st-confirmed{color:var(--ok);font-weight:700}.st-cancelled{color:var(--bad);font-weight:700}.st-rescheduled{color:#175cd3;font-weight:700}
+.empty{color:var(--muted);font-size:13px}
+input[type=text]{flex:1;min-height:40px;padding:8px 12px;font:inherit;border:1px solid #9aa5b1;border-radius:8px;background:#fff;color:var(--ink)}
+button{min-height:40px;padding:8px 16px;font:inherit;font-weight:600;background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:8px;cursor:pointer;transition:background-color .12s,border-color .12s,box-shadow .12s}
+button:hover:not(:disabled){background:var(--accent-strong);border-color:var(--accent-strong)}
+button.secondary{background:#fff;color:var(--ink);border-color:#9aa5b1}
+button.secondary:hover:not(:disabled){background:#f1f3f5;border-color:var(--ink)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
+button:disabled{opacity:.5;cursor:default}
+.choices{white-space:normal;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:8px}
+.choices>button.secondary{background:#fff;color:var(--accent-strong);border:1.5px solid var(--accent);border-radius:999px;font-weight:500;margin:0}
+.choices>button.secondary:hover:not(:disabled){background:var(--accent-tint);border-color:var(--accent-strong)}
+.choices .card{flex:1 1 100%;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px}
+.choices .card b{font-size:16px;font-weight:700}
+.choices .card div{font-size:14px;color:var(--muted);margin:0 0 4px}
+.choices .card button{margin:4px 6px 0 0;background:#fff;color:var(--accent-strong);border:1.5px solid var(--accent);border-radius:999px;font-weight:500}
+.choices .card button:hover:not(:disabled){background:var(--accent);color:#fff}
+pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;padding:8px;background:#f1f3f5;border-radius:6px}
+.ev{white-space:normal;margin:0 0 8px;font-size:14px;word-break:break-word}
+.ev summary{cursor:pointer}
+.tag{display:inline-block;font-weight:700;font-size:11px;line-height:1.5;letter-spacing:.06em;text-transform:uppercase;margin-right:8px;padding:0 8px;border-radius:999px;background:var(--info-tint);color:#3d4b5c}
+.ev.red .tag{background:var(--bad-tint);color:var(--bad)}.ev.green .tag{background:var(--ok-tint);color:var(--ok)}.ev.amber .tag{background:var(--warn-tint);color:var(--warn)}
+.legend{font-size:13px;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line)}
+.cap{font-size:13px;color:var(--muted);margin:4px 0 0;max-width:420px}
+#simbox{text-align:right}
+@media(max-width:800px){main{grid-template-columns:1fr;height:auto}section{min-height:420px}#simbox{text-align:left}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style><header><div class="wrap top"><div class="brand"><span class="mark" aria-hidden="true"></span><div><h1>Orange Errand Agent <span class="pill">Demo</span></h1><p class="tagline">Book home services. You approve every step.</p></div></div><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div></div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
 <script>
 let pending=null;const chat=document.getElementById('chat'),trace=document.getElementById('trace'),actions=document.getElementById('actions'),tech=document.getElementById('tech');
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function readableTimes(s){return String(s).replace(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g,(m,y,mo,d,h,mi)=>{const hh=+h;return DAYS[new Date(Date.UTC(+y,+mo-1,+d)).getUTCDay()]+' '+(+d)+' '+MONTHS[+mo-1]+', '+(hh%12||12)+':'+mi+' '+(hh<12?'AM':'PM')})}
-function bubble(text,kind){const d=document.createElement('div');d.className='bubble '+kind;d.textContent=kind==='agent'?readableTimes(text):text;chat.append(d);chat.scrollTop=chat.scrollHeight;return d}
+const friendly=id=>String(id).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+let log=[];function store(){try{sessionStorage.setItem('chatlog',JSON.stringify(log.slice(-60)))}catch(e){}}
+function bubble(text,kind,temp){const d=document.createElement('div');d.className='bubble '+kind;d.textContent=kind==='agent'?readableTimes(text):text;chat.append(d);chat.scrollTop=chat.scrollHeight;if(!temp){log.push([kind,String(text)]);store()}return d}
+function restoreChat(){try{const a=JSON.parse(sessionStorage.getItem('chatlog')||'[]');if(Array.isArray(a))for(const [k,t] of a)if((k==='you'||k==='agent')&&typeof t==='string')bubble(t,k)}catch(e){}}
 let timer=null;function poll(ms){clearInterval(timer);timer=setInterval(refresh,ms)}
 function setBusy(on){for(const n of document.querySelectorAll('button,#message'))n.disabled=on}
-async function run(path,data,label){setBusy(true);poll(1000);const wait=bubble(label,'agent');let out;try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});out=await r.json()}catch(e){out={message:'Could not reach the assistant. Please try again.',status:'error'}}finally{wait.remove();setBusy(false);poll(3000)}show(out)}
+let wait=null,waitLabel='',marker=null;
+async function run(path,data,label){setBusy(true);poll(1000);waitLabel=label;marker=lastItems.length?JSON.stringify(lastItems[lastItems.length-1]):null;wait=bubble(label,'agent',true);const w=wait;let out;try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});out=await r.json()}catch(e){out={message:'Could not reach the assistant. Please try again.',status:'error'}}finally{w.remove();wait=null;setBusy(false);poll(3000)}show(out)}
 function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
 function clearChoices(){for(const n of chat.querySelectorAll('.choices'))n.remove()}
 function chipBox(){clearChoices();const d=el('div','','choices');chat.append(d);return d}
@@ -40,10 +106,10 @@ function optionCards(options){const box=chipBox();for(const o of options){const 
 const RED=new Set(['run_error','model_error','web_error','not_approved','status_error']),SKIP=new Set(['event','action_id']);
 const T=(tag,text,tone)=>({tag,text,tone:tone||''});
 function plain(i){const a=i.arguments||{},r=i.result;switch(i.event){
-case 'tool_call':if(i.tool==='update_request'){const p=[a.service,a.area,a.date_range,a.budget?'up to ₹'+a.budget:null].filter(Boolean);return T('AI','Understood your request: '+p.join(' · '))}if(i.tool==='get_provider')return T('PROVIDER','Read reviews of '+a.provider_id);return null;
+case 'tool_call':if(i.tool==='update_request'){const p=[a.service,a.area,a.date_range,a.budget?'up to ₹'+a.budget:null].filter(Boolean);return T('AI','Understood your request: '+p.join(' · '))}if(i.tool==='get_provider')return T('PROVIDER','Read reviews of '+friendly(a.provider_id));return null;
 case 'tool_result':if(i.tool==='search_providers')return T('PROVIDER','Searched and found '+(Array.isArray(r)?r.length:0)+' providers');if(i.tool==='hold_slot')return T('PROVIDER','Held the slot for 10 minutes at ₹'+(r&&r.price));return null;
 case 'review_flagged':return T('SAFETY',"Flagged a risky review and ignored it: '"+i.excerpt+"'",'amber');
-case 'select_clicked':return T('YOU','You picked '+i.provider_id+' at '+readableTimes(i.slot));
+case 'select_clicked':return T('YOU','You picked '+friendly(i.provider_id)+' at '+readableTimes(i.slot));
 case 'proposed':return null;
 case 'approved':return T('YOU','You approved','green');
 case 'book_call':return T('PROVIDER','Sent the booking request');
@@ -57,17 +123,35 @@ case 'run_outcome':if(i.status==='approval_required')return T('APPROVAL','Asked 
 default:if(RED.has(i.event))return T('ERROR',i.message||i.error||i.event,'red');return null}}
 function summary(i){const parts=[];for(const [k,v] of Object.entries(i)){if(SKIP.has(k))continue;let t=typeof v==='object'&&v!==null?JSON.stringify(v):String(v);if(t.length>80)t=t.slice(0,80)+'…';parts.push(k+'='+t)}return parts.join(' ')}
 function row(i){const p=plain(i);if(!p&&!tech.checked)return null;const d=el('details','','ev '+(p?p.tone:'')),s=document.createElement('summary');if(p)s.append(el('span',p.tag,'tag'),p.text);else s.append(el('b',i.event),' '+summary(i));d.append(s,el('pre',JSON.stringify(i,null,2)));return d}
-function runSummary(items){let k=items.map(i=>i.event).lastIndexOf('run_started');const m=items.slice(k<0?0:k).filter(i=>i.event==='model_call'),box=document.getElementById('runsum');if(!m.length){box.textContent='Last run: waiting';return}const u=x=>x.usage||{},t=m.reduce((a,x)=>a+(u(x).input_tokens||0)+(u(x).output_tokens||0),0),c=m.filter(x=>typeof x.estimated_usd==='number'),s=m.reduce((a,x)=>a+(x.latency_ms||0),0)/1000;box.textContent='Last run: '+m.length+' model calls · '+t+' tokens · '+(c.length?'about $'+c.reduce((a,x)=>a+x.estimated_usd,0).toFixed(3)+' (estimated)':'cost n/a')+' · model time '+s.toFixed(1)+' s'}
-async function refresh(){const r=await fetch('/trace');const items=await r.json();runSummary(items);trace.replaceChildren(...items.map(row).filter(Boolean));trace.scrollTop=trace.scrollHeight}
+function runSummary(items){let m=[],end=items.length;for(let k=items.length-1;k>=0;k--){if(items[k].event!=='run_started')continue;m=items.slice(k,end).filter(i=>i.event==='model_call');if(m.length)break;end=k}if(!m.length)m=items.filter(i=>i.event==='model_call');const box=document.getElementById('runsum');if(!m.length){box.textContent='Last run: waiting';return}const u=x=>x.usage||{},t=m.reduce((a,x)=>a+(u(x).input_tokens||0)+(u(x).output_tokens||0),0),c=m.filter(x=>typeof x.estimated_usd==='number'),s=m.reduce((a,x)=>a+(x.latency_ms||0),0)/1000;box.textContent='Last run: '+m.length+' model calls · '+t+' tokens · '+(c.length?'about $'+c.reduce((a,x)=>a+x.estimated_usd,0).toFixed(3)+' (estimated)':'cost n/a')+' · model time '+s.toFixed(1)+' s'}
+let lastItems=[],lastBookings=[];
+function liveLine(items){let i=marker?items.map(x=>JSON.stringify(x)).lastIndexOf(marker):-1;const fresh=items.slice(i+1);for(let k=fresh.length-1;k>=0;k--){const p=plain(fresh[k]);if(p)return p.text}return ''}
+async function refresh(){const items=await (await fetch('/trace')).json();lastItems=items;runSummary(items);const rows=items.map(row).filter(Boolean);trace.replaceChildren(...(items.length?rows:[el('div','Watch the assistant work here once you send a request.','empty')]));trace.scrollTop=trace.scrollHeight;if(wait){const t=liveLine(items);wait.textContent=waitLabel+(t?' '+readableTimes(t):'')}refreshBookings()}
+async function refreshBookings(){try{lastBookings=(await (await fetch('/bookings')).json()).bookings||[]}catch(e){}renderBookings()}
+function renderBookings(){const box=document.getElementById('bookings');box.replaceChildren();box.hidden=!lastBookings.length;for(const b of lastBookings){const c=el('span','','chipb');c.append(friendly(b.provider)+' · '+b.slot_label+' · ',el('span',b.status[0].toUpperCase()+b.status.slice(1),'st-'+b.status));box.append(c)}if(lastBookings.length&&pendingKind==='replacement')box.append(el('span','Replacement waiting for your yes','chipb dashed'))}
 tech.onchange=refresh;
 const WORDS={book:['Approve this booking?','Yes, book it'],cancel:['Approve cancelling this booking?','Yes, cancel it'],reschedule:['Approve rescheduling this booking?','Yes, reschedule']};
-function renderPending(p){document.getElementById('simbox').hidden=!p.has_confirmed;if(!p.action_id){pending=null;actions.hidden=true;return}pending=p.action_id;const q=p.proposal||{},w=WORDS[q.action]||WORDS.book,wait=p.status==='pending';document.getElementById('proposal').textContent=(wait?'Waiting for the provider. Check the booking status.':w[0])+' Provider: '+q.provider_id+' · Time: '+q.slot_label+' · Price: ₹'+q.price;document.getElementById('approve').textContent=wait?'Check booking status':w[1];document.getElementById('deny').hidden=wait;actions.hidden=false}
+let pendingKind=null,curProposal=null;
+function renderPending(p){document.getElementById('simbox').hidden=!p.has_confirmed;pendingKind=p.kind||null;if(!p.action_id){pending=null;actions.hidden=true;renderBookings();return}pending=p.action_id;const q=p.proposal||{},w=WORDS[q.action]||WORDS.book,wait=p.status==='pending';curProposal=q;
+const box=document.getElementById('proposal'),rows=[['Provider',friendly(q.provider_id)],['When',q.slot_label],['Price','₹'+q.price]];
+box.replaceChildren(el('h3',wait?'Waiting for the provider. Check the booking status.':p.kind==='replacement'?'Your booking was cancelled. Approve a replacement?':w[0]));
+if(p.replaces)box.append(el('div','Replaces your cancelled booking: '+friendly(p.replaces.provider)+', '+p.replaces.slot_label,'note'));
+for(const [l,v] of rows){const r=el('div','','rrow');r.append(el('span',l,'lbl'),el('span',v,'val'));box.append(r)}
+if(!wait)box.append(el('p','Nothing is booked until you click Yes.','note'));
+document.getElementById('approve').textContent=wait?'Check booking status':p.kind==='replacement'&&q.action==='book'?'Yes, book the replacement':w[1];document.getElementById('deny').hidden=wait;actions.hidden=false;renderBookings()}
 async function syncPending(){renderPending(await (await fetch('/pending')).json())}
-function show(result){clearChoices();bubble(result.message||result.error||result.status,'agent');pending=result.status==='approval_required'?result.action_id:null;actions.hidden=!pending;if(result.options&&result.options.length)optionCards(result.options);else if(result.missing&&result.missing.length)missingChips(result.missing);syncPending();refresh()}
+const SENT={slot_taken:'That slot was just taken. Nothing was booked.',not_booked:'The booking did not go through. Nothing was booked.',slot_conflict:'That time clashes with another booking. Nothing was booked.',not_approved:'Okay, nothing was done.',cancelled:'Your booking was cancelled.',rescheduled:'Your booking was rescheduled.',hold_expired:'That hold expired. Nothing was booked.'};
+function confirmCard(q,items){const c=el('div','','confirm-card');c.append(el('h3','Booking confirmed'));for(const [l,v] of [['Provider',friendly(q.provider_id)],['When',q.slot_label],['Price','₹'+q.price]]){const r=el('div','','rrow');r.append(el('span',l,'lbl'),el('span',v,'val'));c.append(r)}c.append(el('p','Booked. One booking, verified.','note'));
+let k=items.map(i=>i.event).lastIndexOf('approved');const after=items.slice(k<0?0:k).map(i=>i.event),t=after.indexOf('booking_timeout');if(t>=0&&after.slice(t).some(e=>e==='status_checked'||e==='confirmed'))c.append(el('div',"The provider didn't confirm in time, so I asked it directly. It confirmed once; nothing was booked twice.",'hl'));chat.append(c);chat.scrollTop=chat.scrollHeight}
+async function show(result){clearChoices();const msg=result.message||result.error||result.status,st=result.status;pending=st==='approval_required'?result.action_id:null;if(!pending)actions.hidden=true;
+if(st==='confirmed'&&curProposal&&curProposal.action==='book'){let items=lastItems;try{items=await (await fetch('/trace')).json()}catch(e){}confirmCard(curProposal,items);log.push(['agent','Booking confirmed: '+friendly(curProposal.provider_id)+', '+curProposal.slot_label+', ₹'+curProposal.price]);store()}
+else if(result.options&&result.options.length){const lbl=String(result.options[0].slots&&result.options[0].slots[0]?result.options[0].slots[0].label:'');bubble('Here are '+result.options.length+' options'+(lbl?' for '+lbl.split(',')[0]:'')+'. Pick a time.','agent')}
+else if(!(st==='approval_required'&&result.action_id&&/^(Approve |Pending |Your .* booking was cancelled\. Approve)/.test(msg)))bubble(SENT[st]||msg,'agent');
+if(result.options&&result.options.length)optionCards(result.options);else if(result.missing&&result.missing.length)missingChips(result.missing);syncPending();refresh()}
 document.getElementById('form').onsubmit=async e=>{e.preventDefault();const input=document.getElementById('message'),value=input.value.trim();if(!value)return;input.value='';send(value)};
 for(const [id,approved] of [['approve',true],['deny',false]])document.getElementById(id).onclick=()=>{if(pending)run('/approve',{action_id:pending,approved},'Working on it…')};
 document.getElementById('simcancel').onclick=()=>run('/simulate-provider-cancel',{},'Working on it…');
-refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(p.action_id)bubble(p.message,'agent');else startChips()});poll(3000);
+restoreChat();refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(!p.action_id&&!chat.children.length)startChips()});poll(3000);
 </script></html>"""
 
 
@@ -102,6 +186,12 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
 
     busy = threading.Lock()
 
+    def friendly(provider_id):
+        return str(provider_id).replace("-", " ").replace("_", " ").title()
+
+    def booking_slot(booking):
+        return {"provider": friendly(booking["provider"]), "slot_label": _slot_label(booking["slot"])}
+
     class Handler(BaseHTTPRequestHandler):
         def send(self, code, data, content_type="application/json"):
             body = data.encode() if isinstance(data, str) else json.dumps(data).encode()
@@ -124,11 +214,28 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                     return self.send(200, out)
                 proposal = dispatcher.presented_proposal(action_id)
                 status = dispatcher.status(action_id)
-                return self.send(200, {**out, "action_id": action_id, "status": status,
+                with sqlite3.connect(db) as conn:
+                    replaced = conn.execute("SELECT booking_id FROM replacement_events WHERE action_id = ?", (action_id,)).fetchone()
+                kind = "replacement" if replaced else {"book": "booking"}.get(proposal.get("action", "book"), proposal.get("action"))
+                extra = {}
+                if replaced:
+                    original = next((b for b in provider.list_bookings("demo") if b["id"] == replaced[0]), None)
+                    if original:
+                        extra["replaces"] = booking_slot(original)
+                return self.send(200, {**out, **extra, "kind": kind, "action_id": action_id, "status": status,
                                        "message": f"Pending {proposal.get('action', 'booking')}: {proposal['provider_id']} at {proposal['slot']} for ₹{proposal['price']}",
                                        "proposal": {"action": proposal.get("action", "book"), "provider_id": proposal["provider_id"],
                                                     "slot": proposal["slot"], "slot_label": _slot_label(proposal["slot"]),
                                                     "price": proposal["price"]}})
+            if self.path == "/bookings":
+                items = []
+                for b in provider.list_bookings("demo"):
+                    try:
+                        price = provider.booking_price(b["id"])
+                    except Exception:
+                        price = None
+                    items.append({"id": b["id"], **booking_slot(b), "price": price, "status": b["status"]})
+                return self.send(200, {"bookings": items})
             self.send(404, {"error": "not found"})
 
         def do_POST(self):
