@@ -100,7 +100,7 @@ Seeded randomness or named scenarios must make every outcome reproducible. The e
 
 ## Questions to settle before implementation
 
-- Anthropic is the preferred live provider; the user has a key. Read it from `ANTHROPIC_API_KEY`, never commit it or ask for it in chat. The reviewer may supply their own key. Set hard model-turn/token limits in the app; recommend a dedicated Anthropic workspace with a small monthly spend cap in the Console for the user's key. Offline scenarios need no key.
+- Anthropic is the preferred live provider; the user has a key. Read it from `ANTHROPIC_API_KEY`, never commit it, paste it into chat, or expose it in the demo UI. The reviewer may supply their own key through the same environment variable. Set hard model-turn/token limits in the app and bind any local page to loopback only. Recommend a dedicated Anthropic workspace with the lowest practical monthly spend cap (target $5 if the Console permits) for the user's key; app-side estimates alone are not a reliable abuse cap. Offline scenarios need no key.
 - Which `user_id`/thread identity should the demo use? Prefer a small local page with chat left and trace right after the safety gate; use two terminal panes if the schedule slips. Neither interface may receive or display the API key.
 - How should the mock represent cancellation events and ambiguous `get_booking_status` results? Define scenarios without altering the PDF's stated tool inputs, outputs, or failures.
 - Does “PID” here mean this project initiation document, or did the user intend a PRD? Keep this document as the planning reference either way.

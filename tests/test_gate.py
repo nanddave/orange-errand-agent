@@ -20,14 +20,16 @@ def test_no_booking_without_exact_approval(tmp_path):
     db = tmp_path / "business.sqlite"
     provider = MockBookingProvider(db)
     dispatcher = ActionDispatcher(db, provider, tmp_path / "trace.jsonl")
-    action_id = dispatcher.propose(PROPOSAL)
+    hold = provider.hold_slot(PROPOSAL["provider_id"], PROPOSAL["slot"])
+    proposal = {**PROPOSAL, "hold_id": hold["hold_id"]}
+    action_id = dispatcher.propose(proposal)
 
     with pytest.raises(PermissionError):
         dispatcher.execute(action_id)
     assert provider.book_call_count() == 0
 
-    dispatcher.approve(action_id, PROPOSAL)
-    dispatcher.change(action_id, {**PROPOSAL, "price": 1500})
+    dispatcher.approve(action_id, proposal)
+    dispatcher.change(action_id, {**proposal, "price": 1500})
     with pytest.raises(PermissionError):
         dispatcher.execute(action_id)
     assert provider.book_call_count() == 0
@@ -39,7 +41,9 @@ def test_timeout_after_success_restart_resumes_without_second_book_call(tmp_path
     trace = tmp_path / "trace.jsonl"
     provider = MockBookingProvider(db, timeout_after_success=True, status_error_once=True)
     dispatcher = ActionDispatcher(db, provider, trace)
-    action_id = dispatcher.propose(PROPOSAL)
+    hold = provider.hold_slot(PROPOSAL["provider_id"], PROPOSAL["slot"])
+    proposal = {**PROPOSAL, "hold_id": hold["hold_id"]}
+    action_id = dispatcher.propose(proposal)
     config = {"configurable": {"thread_id": "booking-1"}}
 
     with SqliteSaver.from_conn_string(str(checkpoints)) as saver:
@@ -47,7 +51,7 @@ def test_timeout_after_success_restart_resumes_without_second_book_call(tmp_path
         result = graph.invoke({"action_id": action_id}, config, durability="sync")
         assert result["__interrupt__"]
         with pytest.raises(RuntimeError, match="status temporarily unavailable"):
-            graph.invoke(Command(resume={"approved": True, "proposal": PROPOSAL}), config, durability="sync")
+            graph.invoke(Command(resume={"approved": True, "proposal": proposal}), config, durability="sync")
 
     assert provider.booking_count() == 1
     assert provider.book_call_count() == 1
@@ -66,6 +70,6 @@ def test_timeout_after_success_restart_resumes_without_second_book_call(tmp_path
         "proposed", "approved", "book_call", "booking_timeout", "status_error",
         "recovery_started", "status_checked", "confirmed"
     ]
-    assert events[0]["proposal"] == PROPOSAL
+    assert events[0]["proposal"] == proposal
     assert events[2]["idempotency_key"] == events[6]["idempotency_key"]
     assert events[-1]["message"] == "Booking confirmed."

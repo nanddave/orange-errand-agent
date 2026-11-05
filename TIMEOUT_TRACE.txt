@@ -1,0 +1,20 @@
+{"event": "run_started", "action_id": "", "user_id": "demo"}
+{"event": "context_sent", "context": "", "bytes": 0}
+{"event": "model_call", "action_id": "", "turn": 1, "latency_ms": 0, "usage": {}, "estimated_usd": null}
+{"event": "tool_call", "action_id": "", "tool": "update_request", "arguments": {"service": "plumber", "area": "Indiranagar", "date_range": "2026-11-06", "budget": 1500}}
+{"event": "tool_result", "action_id": "", "tool": "update_request", "latency_ms": 0, "result": {"known_facts": {"service": "plumber", "area": "Indiranagar", "date_range": "2026-11-06", "budget": 1500}}}
+{"event": "model_call", "action_id": "", "turn": 2, "latency_ms": 0, "usage": {}, "estimated_usd": null}
+{"event": "tool_call", "action_id": "", "tool": "search_providers", "arguments": {}}
+{"event": "tool_result", "action_id": "", "tool": "search_providers", "latency_ms": 0, "result": [{"id": "plumber-1", "service": "plumber", "area": "Indiranagar", "price": 1400, "rating": 4.7, "slots": ["2026-11-06T09:00:00+05:30", "2026-11-06T11:00:00+05:30"], "attributes": ["verified", "morning availability"]}, {"id": "plumber-2", "service": "plumber", "area": "Indiranagar", "price": 1500, "rating": 4.6, "slots": ["2026-11-06T09:00:00+05:30", "2026-11-06T11:00:00+05:30"], "attributes": ["verified", "morning availability"]}]}
+{"event": "model_call", "action_id": "", "turn": 3, "latency_ms": 0, "usage": {}, "estimated_usd": null}
+{"event": "tool_call", "action_id": "", "tool": "hold_slot", "arguments": {"provider_id": "plumber-1", "slot": "2026-11-06T09:00:00+05:30"}}
+{"event": "tool_result", "action_id": "", "tool": "hold_slot", "latency_ms": 0, "result": {"hold_id": "9f0904a4-8b94-44f3-a560-d36ebaeb3735", "expires_at": 1793895405.6204128, "price": 1400}}
+{"event": "model_call", "action_id": "", "turn": 4, "latency_ms": 0, "usage": {}, "estimated_usd": null}
+{"event": "tool_call", "action_id": "", "tool": "book", "arguments": {"hold_id": "9f0904a4-8b94-44f3-a560-d36ebaeb3735"}}
+{"event": "proposed", "action_id": "88034d89-ef58-4e3d-aec8-9553b37bffd9", "proposal": {"user_id": "demo", "hold_id": "9f0904a4-8b94-44f3-a560-d36ebaeb3735", "provider_id": "plumber-1", "slot": "2026-11-06T09:00:00+05:30", "price": 1400}}
+{"event": "run_outcome", "action_id": "", "status": "approval_required", "message": "Approve booking plumber-1 at 2026-11-06T09:00:00+05:30 for \u20b91400?"}
+{"event": "approved", "action_id": "88034d89-ef58-4e3d-aec8-9553b37bffd9"}
+{"event": "book_call", "action_id": "88034d89-ef58-4e3d-aec8-9553b37bffd9", "idempotency_key": "book:88034d89-ef58-4e3d-aec8-9553b37bffd9"}
+{"event": "booking_timeout", "action_id": "88034d89-ef58-4e3d-aec8-9553b37bffd9", "idempotency_key": "book:88034d89-ef58-4e3d-aec8-9553b37bffd9"}
+{"event": "status_checked", "action_id": "88034d89-ef58-4e3d-aec8-9553b37bffd9", "idempotency_key": "book:88034d89-ef58-4e3d-aec8-9553b37bffd9", "outcome": "confirmed"}
+{"event": "confirmed", "action_id": "88034d89-ef58-4e3d-aec8-9553b37bffd9", "message": "Booking confirmed."}
