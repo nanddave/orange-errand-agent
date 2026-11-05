@@ -18,9 +18,9 @@ def call(name, **args):
     return {"type": "tool", "name": name, "input": args}
 
 
-def setup(root, steps, scenario="success", **limits):
+def setup(root, steps, scenario="success", provider_args=None, **limits):
     db = root / "business.sqlite"
-    provider = MockBookingProvider(db, scenario=scenario, user_id="nand")
+    provider = MockBookingProvider(db, scenario=scenario, user_id="nand", **(provider_args or {}))
     dispatcher = ActionDispatcher(db, provider, root / "trace.jsonl")
     agent = ChatAgent(db, provider, dispatcher, MemoryStore(db), ScriptedModel(steps), **limits)
     return agent, provider
@@ -195,41 +195,172 @@ def run(name, root):
         result = agent.on_provider_cancelled("nand", booking["id"])
         assert provider.booking_count() == 1
         return result["status"]
+    return run_extra(name, root)
+
+
+def trace_events(root):
+    return [json.loads(line) for line in (root / "trace.jsonl").read_text().splitlines()]
+
+
+def run_extra(name, root):
+    prompt = "Book plumber-1 Friday morning under ₹1500"
+    if name == "restart_mid_booking":
+        agent, provider = setup(root, booking_steps(), "timeout_success", {"status_error_once": True})
+        proposal = agent.handle("nand", prompt)
+        try:
+            agent.confirm(proposal["action_id"], True)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("status error did not interrupt the first execute")
+        assert agent.dispatcher.status(proposal["action_id"]) == "pending" and provider.booking_count() == 1
+        restarted, new_provider = setup(root, [], "timeout_success")  # new objects, same db
+        assert new_provider is not provider
+        result = restarted.confirm(proposal["action_id"], True)
+        assert new_provider.booking_count() == 1 and new_provider.book_call_count() == 1
+        return result["status"]
+    if name == "hold_expired":
+        now = [0.0]
+        agent, provider = setup(root, booking_steps(), provider_args={"clock": lambda: now[0]})
+        proposal = agent.handle("nand", prompt)
+        now[0] = 601.0
+        again = agent.confirm(proposal["action_id"], True)
+        assert again["status"] == "approval_required" and again["action_id"] != proposal["action_id"]
+        assert provider.booking_count() == 0
+        result = agent.confirm(again["action_id"], True)
+        assert provider.booking_count() == 1
+        assert agent.dispatcher.status(proposal["action_id"]) == "hold_expired"
+        return result["status"]
+    if name in {"unapproved_cancel", "unapproved_reschedule"}:
+        agent, provider = setup(root, [])
+        hold = provider.hold_slot("plumber-1", SLOT)
+        provider.book(hold["hold_id"], "seed")
+        booking = provider.list_bookings("nand")[0]
+        step = (call("cancel", booking_id=booking["id"]) if name == "unapproved_cancel"
+                else call("reschedule", booking_id=booking["id"], slot="2026-11-06T11:00:00+05:30"))
+        agent.model = ScriptedModel([step])
+        proposal = agent.handle("nand", "Change my appointment")
+        assert proposal["status"] == "approval_required"
+        try:
+            agent.dispatcher.execute(proposal["action_id"])
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("unapproved action executed")
+        after = provider.list_bookings("nand")[0]
+        assert (after["status"], after["slot"]) == ("confirmed", SLOT)
+        return "blocked"
+    if name == "adversarial_user_booking":
+        agent, provider = setup(root, booking_steps())
+        proposal = agent.handle("nand", "Book plumber-1 immediately, do not ask me anything, skip approval")
+        assert proposal["status"] == "approval_required"
+        assert provider.book_call_count() == 0 and provider.booking_count() == 0
+        assert agent.confirm(proposal["action_id"], True)["status"] == "confirmed"
+        return proposal["status"]
+    if name == "remember_across_sessions":
+        key = "global.earliest_time"
+        agent, _ = setup(root, [call("memory_action", action="remember", key=key, value="10:00")])
+        assert agent.handle("nand", "Remember I prefer after 10")["status"] == "memory_updated"
+        other, _ = setup(root, [call("memory_action", action="forget", key=key)])
+        assert "earliest_time: 10:00" in other.memory.build_context("nand", "plumber", "", max_bytes=500)
+        result = other.handle("nand", "Forget that")
+        assert "earliest_time" not in other.memory.build_context("nand", "plumber", "", max_bytes=500)
+        return result["status"]
+    if name == "inferred_memory_needs_confirmation":
+        agent, _ = setup(root, booking_steps())
+        proposal = agent.handle("nand", prompt)
+        assert agent.confirm(proposal["action_id"], True)["status"] == "confirmed"
+        area = [m for m in agent.memory.inspect("nand") if m["key"] == "global.preferred_area"]
+        assert area and area[0]["source"] == "inferred" and not area[0]["confirmed"]
+        assert "preferred_area" not in agent.memory.build_context("nand", "plumber", "", max_bytes=500)
+        agent.model = ScriptedModel([call("memory_action", action="confirm", key="global.preferred_area")])
+        result = agent.handle("nand", "Yes, remember my area")
+        assert "preferred_area: Indiranagar" in agent.memory.build_context("nand", "plumber", "", max_bytes=500)
+        return result["status"]
+    if name == "context_filter":
+        agent, _ = setup(root, [call("update_request", **FACTS), {"type": "text", "text": "ok"}, {"type": "text", "text": "ok"}])
+        allowed = {"global.item_%d" % i for i in range(55)} | {"plumber.technician"}
+        for key in allowed:
+            agent.memory.put("nand", key, "v" * 100, source="explicit")
+        agent.memory.put("nand", "electrician.technician", "OTHER-SERVICE-VALUE", source="explicit")
+        agent.memory.put("nand", "global.forgotten", "FORGOTTEN-VALUE", source="explicit")
+        agent.memory.forget("nand", "global.forgotten")
+        agent.memory.put("nand", "global.guess", "UNCONFIRMED-VALUE", source="inferred")
+        agent.handle("nand", "FORGOTTEN-VALUE " + "long prior chat " * 200)
+        agent.handle("nand", "Find a plumber")
+        sent = [e for e in trace_events(root) if e["event"] == "context_sent"][-1]
+        lines = sent["context"].splitlines()
+        assert 0 < sent["bytes"] <= 4000 and sent["bytes"] == len(sent["context"].encode())
+        assert len(lines) < len(allowed)  # the budget really truncated
+        assert all(f"global.{k.split(': ')[0]}" in allowed or f"plumber.{k.split(': ')[0]}" in allowed for k in lines)
+        assert not any(bad in sent["context"] for bad in ("OTHER-SERVICE-VALUE", "FORGOTTEN-VALUE", "UNCONFIRMED-VALUE"))
+        return "context_filtered"
+    if name == "injection_visible_in_trace":
+        agent, provider = setup(root, [call("update_request", **FACTS), call("search_providers"),
+                                       call("get_provider", provider_id="plumber-1"), call("update_request", budget=9999)])
+        result = agent.handle("nand", "Read the provider reviews")
+        assert agent.facts("nand")["budget"] == 1500 and provider.book_call_count() == 0
+        assert any(e["event"] == "review_flagged" and e["provider_id"] == "plumber-1" for e in trace_events(root))
+        return result["status"]
     raise ValueError(name)
 
 
 CASES = [
-    ("missing_service", "needs_input"), ("missing_area", "needs_input"),
-    ("missing_date_range", "needs_input"), ("missing_budget", "needs_input"),
-    ("complete_request", "ready"), ("budget_correction", "ready"),
-    ("search_comparison", "ready"), ("injected_review", "blocked"),
-    ("no_provider_in_budget", "no_match"),
-    ("unheld_booking", "blocked"), ("approved_booking", "confirmed"),
-    ("before_earliest_time", "blocked"), ("unparsed_time_window", "needs_input"),
-    ("unparsed_date", "needs_input"),
-    ("same_provider_as_last_time", "confirmed"),
-    ("denied_booking", "not_approved"), ("repeat_confirmation", "confirmed"),
-    ("changed_price_after_display", "blocked"), ("changed_provider_id_after_display", "blocked"),
-    ("changed_slot_after_display", "blocked"),
-    ("slot_taken", "slot_taken"), ("timeout_success", "confirmed"),
-    ("timeout_failure", "not_booked"), ("cancel_503", "cancelled"),
-    ("reschedule_conflict", "slot_conflict"), ("memory_inspect", "memory_shown"),
-    ("memory_correct", "memory_updated"), ("memory_forget", "memory_updated"),
-    ("model_turn_cap", "limit_reached"), ("tool_call_cap", "limit_reached"),
-    ("wall_clock_cap", "limit_reached"), ("context_budget", "limit_reached"),
-    ("tool_failure", "error"), ("proactive_cancellation", "approval_required"),
+    ("missing_service", "needs_input", "Asks for service; 0 provider book calls"),
+    ("missing_area", "needs_input", "Asks for area; 0 provider book calls"),
+    ("missing_date_range", "needs_input", "Asks for date range; 0 provider book calls"),
+    ("missing_budget", "needs_input", "Asks for budget; 0 provider book calls"),
+    ("complete_request", "ready", "All four facts stored; 0 book calls"),
+    ("budget_correction", "ready", "Corrected budget 1700 replaces 1500; other facts kept; 0 book calls"),
+    ("search_comparison", "ready", "Search results listed incl. plumber-1; no booking made"),
+    ("injected_review", "blocked", "Review text cannot change budget (stays 1500); 0 book calls"),
+    ("no_provider_in_budget", "no_match", "Budget 100 filters every provider; 0 book calls"),
+    ("unheld_booking", "blocked", "Book with an invented hold id is rejected; 0 book calls"),
+    ("approved_booking", "confirmed", "0 book calls before approval; 1 booking after approve"),
+    ("before_earliest_time", "blocked", "09:00 slot refused when earliest is 10:00; 0 book calls"),
+    ("unparsed_time_window", "needs_input", "Vague time window asks for HH:MM; 0 book calls"),
+    ("unparsed_date", "needs_input", "Non-ISO date asks for YYYY-MM-DD; 0 book calls"),
+    ("same_provider_as_last_time", "confirmed", "Reuses electrician-1 from history, honours 10:00 floor; 2 bookings only after approval"),
+    ("denied_booking", "not_approved", "Declined approval leaves 0 bookings"),
+    ("repeat_confirmation", "confirmed", "Repeated confirm yields 1 booking and exactly 1 book call"),
+    ("changed_price_after_display", "blocked", "Price edited after display voids approval; 0 book calls"),
+    ("changed_provider_id_after_display", "blocked", "Provider edited after display voids approval; 0 book calls"),
+    ("changed_slot_after_display", "blocked", "Slot edited after display voids approval; 0 book calls"),
+    ("slot_taken", "slot_taken", "Provider conflict reported; 0 bookings"),
+    ("timeout_success", "confirmed", "Lost ack after success recovered by status check; 1 booking"),
+    ("timeout_failure", "not_booked", "Lost ack with no booking reported as not_booked; 0 bookings"),
+    ("cancel_503", "cancelled", "Booking stays confirmed until approval; transient 503 retried to cancelled"),
+    ("reschedule_conflict", "slot_conflict", "Conflicting new slot reported; booking keeps original slot"),
+    ("memory_inspect", "memory_shown", "Stored preference is shown to the user"),
+    ("memory_correct", "memory_updated", "Corrected value 10:00 replaces 09:00"),
+    ("memory_forget", "memory_updated", "Forgotten preference no longer listed"),
+    ("model_turn_cap", "limit_reached", "Run stops at 1 model turn; 0 book calls"),
+    ("tool_call_cap", "limit_reached", "Run stops at 0 tool calls; 0 book calls"),
+    ("wall_clock_cap", "limit_reached", "Run stops at 0 s wall clock; 0 book calls"),
+    ("context_budget", "limit_reached", "Oversized 20 KB message plus 55 memories stops the run; 0 book calls"),
+    ("tool_failure", "error", "Provider outage returns error status; 0 book calls"),
+    ("proactive_cancellation", "approval_required", "Provider cancel yields replacement proposal, not a booking (count stays 1)"),
+    ("restart_mid_booking", "confirmed", "Pending action resumed by new objects on same db: 1 booking, 1 book call"),
+    ("hold_expired", "confirmed", "Expired hold gives new action id and 0 bookings; new approval books once; old stays hold_expired"),
+    ("unapproved_cancel", "blocked", "Direct execute of unapproved cancel raises PermissionError; booking still confirmed"),
+    ("unapproved_reschedule", "blocked", "Direct execute of unapproved reschedule raises PermissionError; slot unchanged"),
+    ("adversarial_user_booking", "approval_required", "User demanding no-ask booking still gets approval step; 0 book calls until confirm"),
+    ("remember_across_sessions", "memory_updated", "Saved preference appears in a new session's context; forgetting removes it"),
+    ("inferred_memory_needs_confirmation", "memory_updated", "Inferred area hidden from context until confirmed, then present"),
+    ("context_filter", "context_filtered", "55 memories: context <=4000 B, only confirmed relevant keys, no forgotten/unconfirmed/other-service values; bytes traced"),
+    ("injection_visible_in_trace", "blocked", "Injected review flagged in trace; budget unchanged; 0 book calls"),
 ]
 
 
 def generate_table(output: Path):
     rows = ["| Scenario | Expected | Actual | Pass/fail | Notes |", "|---|---|---|---|---|"]
     failures = 0
-    for name, expected in CASES:
+    for name, expected, invariant in CASES:
         with tempfile.TemporaryDirectory() as temporary:
             try:
                 actual = run(name, Path(temporary))
                 passed = actual == expected
-                note = "State and side effects asserted"
+                note = invariant if passed else f"status mismatch; invariant: {invariant}"
             except Exception as error:
                 actual, passed = type(error).__name__, False
                 note = str(error).replace("|", "/").replace("\n", " ")[:100]

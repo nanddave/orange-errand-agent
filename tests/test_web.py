@@ -1,8 +1,12 @@
 import json
 import threading
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from errand.web import create_server
+import pytest
+
+from errand.gate import MockBookingProvider
+from errand.web import PAGE, create_server
 
 
 def test_local_page_shows_trace_and_requires_matching_approval(tmp_path):
@@ -62,3 +66,51 @@ def test_page_restores_pending_approval_after_restart(tmp_path):
             assert json.load(response)["status"] == "confirmed"
     finally:
         restarted.shutdown(); restarted.server_close(); next_thread.join(timeout=2)
+
+
+def _serve(tmp_path, scenario="timeout_success"):
+    server = create_server(tmp_path, scripted=True, scenario=scenario, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def post(path, data):
+        request = Request(base + path, json.dumps(data).encode(), {"Content-Type": "application/json"})
+        with urlopen(request) as response:
+            return json.load(response)
+
+    def stop():
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+    return post, stop
+
+
+def test_simulate_cancel_without_confirmed_booking_is_409(tmp_path):
+    post, stop = _serve(tmp_path)
+    try:
+        with pytest.raises(HTTPError) as error:
+            post("/simulate-provider-cancel", {})
+        assert error.value.code == 409
+        assert json.load(error.value) == {"error": "no confirmed booking"}
+    finally:
+        stop()
+
+
+def test_simulate_cancel_cancels_provider_side_and_waits_for_approval(tmp_path):
+    post, stop = _serve(tmp_path, "success")
+    try:
+        proposal = post("/chat", {"text": "Book plumber-1 on Friday morning under 1500"})
+        assert post("/approve", {"action_id": proposal["action_id"], "approved": True})["status"] == "confirmed"
+        provider = MockBookingProvider(tmp_path / "business.sqlite", user_id="demo")
+        original = provider.list_bookings("demo")
+        assert [b["status"] for b in original] == ["confirmed"]
+        result = post("/simulate-provider-cancel", {})
+        assert result["status"] == "approval_required" and result["action_id"]
+        after = provider.list_bookings("demo")
+        assert [(b["id"], b["status"]) for b in after] == [(original[0]["id"], "cancelled")]
+    finally:
+        stop()
+
+
+def test_page_has_cancel_button_and_no_innerhtml():
+    assert "Simulate provider cancellation" in PAGE
+    assert "innerHTML" not in PAGE

@@ -13,24 +13,37 @@ python3.11 -m venv .venv
 .venv/bin/python -m errand.evals
 ```
 
-The eval command rewrites `EVAL_TABLE.md` from 34 offline simulated-user scenarios. Tests and evals require no API key. `TIMEOUT_TRACE.txt` is a raw end-to-end scripted chat/booking trace showing timeout after success.
+`pytest` runs the unit tests and all 43 offline simulated-user scenarios, and fails if the committed `EVAL_TABLE.md` is stale. `python -m errand.evals` regenerates that table. Tests and evals need no API key.
 
-For the local chat and trace page, place your own Anthropic key in the environment or in an untracked `.env` file containing `ANTHROPIC_API_KEY=...`. The key is read server-side and never sent to the page. The app reserves at most 20 live model calls per runtime database, limits each request's input size, and caps each model output at 512 tokens. Use a dedicated Anthropic workspace with a small spend limit as the authoritative cost cap. Start the live model with:
+## Live demo (chat left, trace right)
+
+Place your own Anthropic key in the environment or in an untracked `.env` file containing `ANTHROPIC_API_KEY=...`. The key is read server-side and never sent to the page. The app reserves at most 20 live model calls per runtime database, limits each request's input size, caps each model output at 512 tokens, and retries a failed model call once. Use a dedicated Anthropic workspace with a small spend limit as the authoritative cost cap.
 
 ```sh
 .venv/bin/python -m errand.web --scenario timeout_success
 ```
 
-Open `http://127.0.0.1:8765`. Ask for a plumber in Indiranagar on 6 November, morning, under ₹1,500; choose a provider and slot; approve the displayed exact action. The `timeout_success` scenario simulates a booking that succeeded despite a lost acknowledgement, so the trace should show a status lookup before success. Use `--scripted` for an offline interface check. The server binds only to loopback. To use another port, pass `--port 8766`.
+Open `http://127.0.0.1:8765` (loopback only; `--port` changes it, `--scripted` runs an offline interface check with no key).
 
-The mock tool return shapes are JSON objects/lists: search returns 3 providers with `id`, `price`, `rating`, `slots`, `attributes`; provider details include `reviews`; hold returns `hold_id`, `expires_at`, `price`; booking and mutation tools return outcome strings; status returns `confirmed` or `not_found`; list returns booking `id`, `provider`, `service`, `slot`, `status`. Named scenarios make outcomes reproducible. The model cannot make a provider booking without a held slot and a separate approval click.
+1. Ask: "Find a plumber for my kitchen tap on 6 November in Indiranagar, mornings only, under ₹1,500."
+2. Ask: "Read the reviews for plumber-1, then hold its 9am slot and book it." The trace shows the injected review flagged, and the app asks you to approve the exact action.
+3. Click **Approve exact action**. The `timeout_success` scenario loses the booking acknowledgement after the provider booked; the trace shows `booking_timeout`, then `status_checked: confirmed`, then `confirmed`. One provider booking exists.
+4. Click **Simulate provider cancellation**. The agent notices without a user message, finds a replacement within your known preferences, and asks for fresh approval. It never books a replacement on its own.
+
+Each trace line expands to its raw JSON. Review text is untrusted and is rendered as plain text.
 
 ## Evidence
 
 - [Design note](DESIGN_NOTE.md): state, approval, idempotency, memory and trace excerpt.
-- [Generated eval table](EVAL_TABLE.md): 34 executed offline scenarios.
+- [Generated eval table](EVAL_TABLE.md): 43 executed offline scenarios, each with the invariant it asserts.
 - [Real bugs](BUGS.md): observed failures, causes, fixes and regression tests.
-- [Raw timeout trace](TIMEOUT_TRACE.txt): one scripted chat through verified booking.
-- [Project plan](PID.md): original requirements and acceptance checklist.
+- [Live trace](TIMEOUT_TRACE_LIVE.txt): raw trace of a real-model run (Claude Sonnet 5.5) through timeout-after-success to verified booking.
+- [Scripted trace](TIMEOUT_TRACE.txt): the same flow with the scripted model, kept as a deterministic reference.
 
-For the 3–5 minute recording, show the page with chat left and trace right. Narrate the proposal, approval, timeout, authoritative status check and verified success. The recording URL and the AI-assistant transcript must be attached to the submission separately.
+## Contract and assumptions
+
+Mock return shapes are JSON objects/lists: search returns 3 providers with `id`, `price`, `rating`, `slots`, `attributes`; `get_provider` returns details (`name`, `price`, `rating`, `attributes`) and `reviews`, with the injection on provider number 1 of each service; hold returns `hold_id`, `expires_at`, `price`; booking and mutation tools return outcome strings; status returns `confirmed` or `not_found`; list returns booking `id`, `provider`, `service`, `slot`, `status`. Named scenarios (or a seeded draw: 70% success, 15% slot taken, 15% timeout of which half booked) make outcomes reproducible. The model cannot create a provider booking without a held slot and a separate approval click. An expired hold produces a new hold and a new approval, never a silent rebook.
+
+`estimated_usd` in the trace uses assumed rates of $2 per million input tokens and $10 per million output tokens. It is an estimate, not billing data.
+
+Before sharing this folder, remove `.env` or share the repository with `git clone`/`git archive` only.

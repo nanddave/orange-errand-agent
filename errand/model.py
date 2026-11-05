@@ -16,7 +16,7 @@ class AnthropicModel:
     live = True
 
     def __init__(self, client=None):
-        self.client = client or Anthropic(max_retries=0, timeout=20.0)
+        self.client = client or Anthropic(max_retries=1, timeout=20.0)
 
     def next(self, messages: list[dict], tools: list[dict]) -> dict:
         response = self.client.messages.create(

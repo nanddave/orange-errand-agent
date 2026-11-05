@@ -58,3 +58,20 @@ Record an issue here only after it is reproduced. For each: observed failure, ro
 - **Fix:** use the same time-constraint check as the search and hold path.
 - **Regression:** `tests/test_proactive.py::test_replacement_respects_active_not_before_time`.
 
+## 9. Real model's slot format was rejected, so no booking could start
+
+- **Observed:** the first live run with the real model blocked at `hold_slot` with "That slot is not in the current search results." The model had sent `2026-11-06T09:00`, and on a second run `2026-11-06 09:00`, for the offered slot `2026-11-06T09:00:00+05:30`. No offline scenario had caught it.
+- **Cause:** the agent compared the model's slot to the offered slots by exact string. The scripted model always sent the exact text; a real model varies the format.
+- **Fix:** match on the date and `HH:MM` parsed from whatever the model sends, then hold only the exact offered slot text. A slot the provider never offered is still blocked. The tool description also tells the model to copy the slot as listed.
+- **Regression:** `tests/test_agent_behaviors.py::test_abbreviated_model_slot_is_canonicalised_but_unoffered_slot_is_blocked` and `::test_space_separated_model_slot_is_canonicalised`.
+
+## 10–15. Defects found by an independent review of the approval changes
+
+A separate read-only reviewer reproduced these in a throwaway copy; each was fixed with a regression test in `tests/test_review_fixes.py`.
+
+- **Two replacement bookings for one provider cancellation.** After an expired hold was re-proposed, the cancel event's record still pointed at the old action, so a redelivered event proposed a second replacement and both could be approved. Fix: re-point the record to the new action.
+- **A booked hold could be proposed again.** The hold stayed in the session after booking. Fix: drop the hold from the session once its booking is confirmed.
+- **Saved times were not validated.** `remember` accepted "9:30", which sorts below every slot and silently hid all providers. Fix: require valid `HH:MM` for earliest/latest times in `remember` and `correct`.
+- **Slot matching ignored the timezone offset.** `…09:00:00Z` held the `+05:30` slot. Fix: when the model gives an offset, it must equal the offered one.
+- **Simulated provider cancellation could orphan a pending approval.** Fix: refuse with 409 while an action awaits approval.
+- **Forgetting a preference before it was inferred did not stop the inference.** Fix: `forget` stores a tombstone row.

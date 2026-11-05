@@ -16,16 +16,21 @@ from errand.model import AnthropicModel, ScriptedModel
 
 PAGE = """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Orange Errand Agent</title><style>
-body{font:15px system-ui,sans-serif;margin:0;background:#f7f8fa;color:#17212b}header{background:#fff;border-bottom:1px solid #ddd;padding:16px 24px}h1{font-size:20px;margin:0}main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;height:calc(100vh - 90px);box-sizing:border-box}section{display:flex;flex-direction:column;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden}h2{font-size:15px;margin:0;padding:14px;border-bottom:1px solid #eee}.body{padding:16px;overflow:auto;flex:1;white-space:pre-wrap}.bubble{padding:10px 13px;border-radius:10px;margin:0 0 10px;max-width:90%}.you{background:#e9f1fb;margin-left:auto}.agent{background:#fff3e7}form,.actions{display:flex;gap:8px;padding:12px;border-top:1px solid #eee}input{flex:1;padding:10px;font:inherit}button{padding:10px 14px;background:#e67722;color:white;border:0;border-radius:7px;cursor:pointer}button.secondary{background:#596675}pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:0 0 8px;padding:8px;background:#f5f6f8;border-radius:5px}@media(max-width:750px){main{grid-template-columns:1fr;height:auto}section{height:45vh}}
-</style><header><h1>Orange Errand Agent · local demo</h1></header><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="actions" class="actions" hidden><button id="approve">Approve exact action</button><button id="deny" class="secondary">Decline</button></div><form id="form"><input id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>Execution trace</h2><div id="trace" class="body" aria-live="polite"></div></section></main>
+body{font:15px system-ui,sans-serif;margin:0;background:#f7f8fa;color:#17212b}header{background:#fff;border-bottom:1px solid #ddd;padding:16px 24px}h1{font-size:20px;margin:0}main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;height:calc(100vh - 90px);box-sizing:border-box}section{display:flex;flex-direction:column;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden}h2{font-size:15px;margin:0;padding:14px;border-bottom:1px solid #eee}.body{padding:16px;overflow:auto;flex:1;white-space:pre-wrap}.bubble{padding:10px 13px;border-radius:10px;margin:0 0 10px;max-width:90%}.you{background:#e9f1fb;margin-left:auto}.agent{background:#fff3e7}form,.actions{display:flex;gap:8px;padding:12px;border-top:1px solid #eee}input{flex:1;padding:10px;font:inherit}button{padding:10px 14px;background:#e67722;color:white;border:0;border-radius:7px;cursor:pointer}button.secondary{background:#596675}pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;padding:8px;background:#f5f6f8;border-radius:5px}.ev{white-space:normal;margin:0 0 6px;font-size:13px;word-break:break-word}.ev summary{cursor:pointer}.ev.red{color:#b42318}.ev.green{color:#067647}.ev.amber{color:#b54708}header{display:flex;justify-content:space-between;align-items:center}@media(max-width:750px){main{grid-template-columns:1fr;height:auto}section{height:45vh}}
+</style><header><h1>Orange Errand Agent · local demo</h1><button id="simcancel" class="secondary" type="button">Simulate provider cancellation</button></header><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="actions" class="actions" hidden><button id="approve">Approve exact action</button><button id="deny" class="secondary">Decline</button></div><form id="form"><input id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>Execution trace</h2><div id="trace" class="body" aria-live="polite"></div></section></main>
 <script>
 let pending=null;const chat=document.getElementById('chat'),trace=document.getElementById('trace'),actions=document.getElementById('actions');
 function bubble(text,kind){const d=document.createElement('div');d.className='bubble '+kind;d.textContent=text;chat.append(d);chat.scrollTop=chat.scrollHeight}
 async function post(path,data){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});return r.json()}
-async function refresh(){const r=await fetch('/trace');const items=await r.json();trace.replaceChildren();for(const item of items){const p=document.createElement('pre');p.textContent=JSON.stringify(item,null,2);trace.append(p)}trace.scrollTop=trace.scrollHeight}
+const RED=new Set(['run_error','model_error','web_error','not_approved','status_error']),AMBER=new Set(['booking_timeout','recovery_started','cancel_503','review_flagged','provider_cancelled_event']),SKIP=new Set(['event','action_id']);
+function tone(i){if(RED.has(i.event)||['blocked','error','limit_reached'].includes(i.status))return 'red';if(i.event==='approved'||i.event==='confirmed'||(i.event==='status_checked'&&i.outcome==='confirmed'))return 'green';return AMBER.has(i.event)?'amber':''}
+function summary(i){const parts=[];for(const [k,v] of Object.entries(i)){if(SKIP.has(k))continue;let t=typeof v==='object'&&v!==null?JSON.stringify(v):String(v);if(t.length>80)t=t.slice(0,80)+'…';parts.push(k+'='+t)}return parts.join(' ')}
+function row(i){const d=document.createElement('details');d.className='ev '+tone(i);const s=document.createElement('summary'),b=document.createElement('b'),pre=document.createElement('pre');b.textContent=i.event;s.append(b,' '+summary(i));pre.textContent=JSON.stringify(i,null,2);d.append(s,pre);return d}
+async function refresh(){const r=await fetch('/trace');const items=await r.json();trace.replaceChildren(...items.map(row));trace.scrollTop=trace.scrollHeight}
 function show(result){bubble(result.message||result.status,'agent');pending=result.status==='approval_required'?result.action_id:null;actions.hidden=!pending;document.getElementById('approve').textContent='Approve exact action';document.getElementById('deny').hidden=false;refresh()}
 document.getElementById('form').onsubmit=async e=>{e.preventDefault();const input=document.getElementById('message'),value=input.value.trim();if(!value)return;bubble(value,'you');input.value='';show(await post('/chat',{text:value}))};
 for(const [id,approved] of [['approve',true],['deny',false]])document.getElementById(id).onclick=async()=>{if(pending)show(await post('/approve',{action_id:pending,approved}))};
+document.getElementById('simcancel').onclick=async()=>{const r=await fetch('/simulate-provider-cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),d=await r.json();show(r.ok?d:{message:d.error,status:'error'})};
 refresh();fetch('/pending').then(r=>r.json()).then(result=>{if(result.action_id){pending=result.action_id;actions.hidden=false;document.getElementById('approve').textContent=result.status==='pending'?'Check booking status':'Approve exact action';document.getElementById('deny').hidden=result.status==='pending';bubble(result.message,'agent')}});setInterval(refresh,3000);
 </script></html>"""
 
@@ -42,7 +47,7 @@ def load_local_key(path: Path):
 def create_server(root: Path, *, scripted=False, scenario="timeout_success", port=8765):
     root.mkdir(parents=True, exist_ok=True)
     if not scripted:
-        load_local_key(root / ".env")
+        load_local_key(Path(__file__).resolve().parent.parent / ".env")
         if not os.getenv("ANTHROPIC_API_KEY"):
             raise RuntimeError("Set ANTHROPIC_API_KEY in the environment or a local .env file")
     db = root / "business.sqlite"
@@ -106,7 +111,16 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                     if not pending["action_id"] or data.get("action_id") != pending["action_id"] or type(data.get("approved")) is not bool:
                         return self.send(403, {"error": "no matching pending action"})
                     result = agent.confirm(pending["action_id"], data["approved"])
-                    pending["action_id"] = None
+                    pending["action_id"] = result.get("action_id") if result.get("status") == "approval_required" else None
+                elif self.path == "/simulate-provider-cancel":
+                    if pending["action_id"] and dispatcher.status(pending["action_id"]) in {"proposed", "pending"}:
+                        return self.send(409, {"error": "resolve the pending action first"})
+                    booking =next((b for b in reversed(provider.list_bookings("demo")) if b["status"] == "confirmed"), None)
+                    if booking is None:
+                        return self.send(409, {"error": "no confirmed booking"})
+                    provider.provider_cancel(booking["id"])
+                    result = agent.on_provider_cancelled("demo", booking["id"])
+                    pending["action_id"] = result.get("action_id")
                 else:
                     return self.send(404, {"error": "not found"})
                 self.send(200, result)

@@ -13,6 +13,13 @@ def test_search_provider_and_hold_contract(tmp_path):
     details = tools.get_provider(matches[0]["id"])
     assert details["id"] == matches[0]["id"]
     assert any("ignore" in review.lower() for review in details["reviews"])
+    assert {"name", "service", "price", "rating", "attributes"} <= set(details)
+    assert details["name"] == "Plumber 1 Services" and details["price"] == matches[0]["price"]
+    assert details["rating"] == matches[0]["rating"]
+    other = tools.get_provider(matches[1]["id"])
+    assert len(other["reviews"]) == 2
+    assert not any("ignore" in review.lower() for review in other["reviews"])
+    assert any("ignore" in r.lower() for r in tools.get_provider("electrician-1")["reviews"])
 
     hold = tools.hold_slot(matches[0]["id"], matches[0]["slots"][0])
     assert hold["expires_at"] == 1600.0

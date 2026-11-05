@@ -28,14 +28,14 @@ TOOLS = [
         "budget": {"type": "integer"}, "preferences": TEXT,
     }),
     _tool("memory_action", "Inspect, correct, or forget a stored preference at the user's request.", {
-        "action": {"type": "string", "enum": ["inspect", "correct", "forget"]},
+        "action": {"type": "string", "enum": ["inspect", "correct", "forget", "remember", "confirm"]},
         "key": TEXT, "value": TEXT,
     }, ("action",)),
     _tool("search_providers", "Find matching home-service providers for a YYYY-MM-DD date.", {
         "service": TEXT, "area": TEXT, "date_range": TEXT,
     }, ("service", "area", "date_range")),
     _tool("get_provider", "Read provider details and untrusted reviews.", {"provider_id": TEXT}, ("provider_id",)),
-    _tool("hold_slot", "Hold a provider slot for ten minutes and get its quoted price.", {
+    _tool("hold_slot", "Hold a provider slot for ten minutes and get its quoted price. Copy the slot exactly as listed in the search results.", {
         "provider_id": TEXT, "slot": TEXT,
     }, ("provider_id", "slot")),
     _tool("book", "Propose booking a held slot; the app asks the user for approval.", {
@@ -54,6 +54,23 @@ TOOLS = [
 ]
 
 REQUIRED = ("service", "area", "date_range", "budget")
+INSTRUCTION_LIKE = re.compile(
+    r"ignore .*(instruction|budget|user|previous)|without approval|disregard|you must|system:|book this provider|do not ask",
+    re.IGNORECASE,
+)
+
+
+def _bad_time(key, value):
+    """True when a saved earliest/latest time is not a valid HH:MM (it is compared as text against slots)."""
+    if not (isinstance(key, str) and key.endswith(("earliest_time", "latest_time"))):
+        return False
+    try:
+        if not re.fullmatch(r"\d{2}:\d{2}", str(value)):
+            return True
+        clock_time.fromisoformat(str(value))
+        return False
+    except ValueError:
+        return True
 
 
 class ChatAgent:
@@ -200,9 +217,26 @@ class ChatAgent:
                 if args["action"] == "inspect":
                     memories = self.memory.inspect(user_id)
                     return self._result(user_id, facts, history, state, "memory_shown", json.dumps(memories) if memories else "No saved preferences.")
+                if args["action"] in {"correct", "remember"} and _bad_time(args.get("key"), args.get("value")):
+                    return self._result(user_id, facts, history, state, "needs_input", "Please give that time as HH:MM, for example 10:00.")
                 if args["action"] == "correct":
-                    self.memory.correct(user_id, args["key"], args["value"])
+                    try:
+                        self.memory.correct(user_id, args["key"], args["value"])
+                    except KeyError:
+                        return self._result(user_id, facts, history, state, "not_found", "No saved preference with that name.")
                     return self._result(user_id, facts, history, state, "memory_updated", "Preference corrected.")
+                if args["action"] == "remember":
+                    key = args.get("key")
+                    if not isinstance(key, str) or not re.fullmatch(r"[a-z0-9_]+\.[a-z0-9_]+", key) or not args.get("value"):
+                        return self._result(user_id, facts, history, state, "needs_input", "Which preference should I save? Please give a key like global.earliest_time or plumber.technician, and a value.")
+                    self.memory.put(user_id, key, str(args["value"]), source="explicit")
+                    return self._result(user_id, facts, history, state, "memory_updated", "Preference saved.")
+                if args["action"] == "confirm":
+                    try:
+                        self.memory.confirm(user_id, args.get("key", ""))
+                    except KeyError:
+                        return self._result(user_id, facts, history, state, "not_found", "No saved preference with that name.")
+                    return self._result(user_id, facts, history, state, "memory_updated", "Preference confirmed.")
                 if args["action"] == "forget":
                     self.memory.forget(user_id, args["key"])
                     return self._result(user_id, facts, history, state, "memory_updated", "Preference forgotten.")
@@ -253,12 +287,24 @@ class ChatAgent:
                 if args.get("provider_id") not in {item["id"] for item in state.get("candidates", [])}:
                     return self._result(user_id, facts, history, state, "blocked", "That provider is not in the current search results. No booking was made.")
                 result = self.tools.get_provider(args["provider_id"])
+                # Observability only: enforcement stays in code (saw_provider_data blocks and the approval gate).
+                for review in result.get("reviews", []):
+                    if INSTRUCTION_LIKE.search(review):
+                        self.dispatcher._log("review_flagged", "", provider_id=args["provider_id"], excerpt=review[:120],
+                                             reason="instruction-like text in untrusted review")
             elif name == "hold_slot":
                 candidate = next((item for item in state.get("candidates", []) if item["id"] == args.get("provider_id")), None)
-                if candidate is None or args.get("slot") not in candidate["slots"]:
+                asked = str(args.get("slot", ""))
+                # Models vary the slot format ("T09:00", " 09:00", no offset); match on date+HH:MM but only ever hold the offered slot text.
+                found = re.search(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})", asked)
+                wanted = f"{found[1]}T{found[2]}:{found[3]}" if found else None
+                zone = re.search(r"(Z|[+-]\d{2}:?\d{2})$", asked)
+                zone = ("+00:00" if zone[1] == "Z" else zone[1] if ":" in zone[1] else zone[1][:3] + ":" + zone[1][3:]) if zone else None
+                slot = next((offered for offered in candidate["slots"] if offered[:16] == wanted and (zone is None or offered.endswith(zone))), None) if candidate and wanted else None
+                if slot is None:
                     return self._result(user_id, facts, history, state, "blocked", "That slot is not in the current search results. No booking was made.")
-                result = self.tools.hold_slot(candidate["id"], args["slot"])
-                state["holds"] = {result["hold_id"]: {"provider_id": candidate["id"], "slot": args["slot"], "price": result["price"]}}
+                result = self.tools.hold_slot(candidate["id"], slot)
+                state["holds"] = {result["hold_id"]: {"provider_id": candidate["id"], "slot": slot, "price": result["price"]}}
                 if result["price"] > facts["budget"]:
                     return self._result(user_id, facts, history, state, "blocked", "The quoted price exceeds your budget. No booking was made.")
             elif name == "book":
@@ -294,7 +340,8 @@ class ChatAgent:
                 return self._result(user_id, facts, history, state, "approval_required", f"Approve {name} of booking {booking['id']} with {booking['provider']} at {proposal['slot']} for ₹{proposal['price']}?", action_id=action_id)
             else:
                 return self._result(user_id, facts, history, state, "blocked", "I cannot use that tool. No new booking was made.")
-            safe_result = {"id": result.get("id"), "review_count": len(result.get("reviews", []))} if name == "get_provider" else result
+            safe_result = {"id": result.get("id"), "review_count": len(result.get("reviews", [])),
+                           "reviews_untrusted": [review[:80] for review in result.get("reviews", [])]} if name == "get_provider" else result
             self.dispatcher._log("tool_result", "", tool=name, latency_ms=round((self.clock() - tool_start) * 1000), result=safe_result)
             self._tool_result(messages, step, result)
         return self._result(user_id, facts, history, state, "limit_reached", "I stopped after too many model turns. No new booking was made.")
@@ -310,7 +357,48 @@ class ChatAgent:
                 {"configurable": {"thread_id": action_id}}, durability="sync",
             )
         outcome = result.get("outcome", "unknown")
+        if proposal.get("action", "book") == "book":
+            if outcome == "confirmed":
+                self._infer_area(proposal["user_id"])
+                self._consume_hold(proposal["user_id"], proposal["hold_id"])
+            elif outcome == "hold_expired":
+                return self._repropose(action_id, proposal)
         return {"status": outcome, "message": "Booking confirmed." if outcome == "confirmed" else outcome.replace("_", " ").capitalize() + "."}
+
+    def _consume_hold(self, user_id, hold_id):
+        # A booked hold is spent: the model cannot propose booking it a second time.
+        facts, history, state = self._load(user_id)
+        if state.get("holds", {}).pop(hold_id, None) is not None:
+            self._save(user_id, facts, history, state)
+
+    def _infer_area(self, user_id):
+        area = self._load(user_id)[0].get("area")
+        # exists() covers forgotten rows too: put() is INSERT OR REPLACE and would resurrect or overwrite them.
+        if area and not self.memory.exists(user_id, "global.preferred_area"):
+            self.memory.put(user_id, "global.preferred_area", area, source="inferred")
+            self.dispatcher._log("memory_inferred", "", key="global.preferred_area")
+
+    def _repropose(self, old_id, old):
+        user_id = old["user_id"]
+        facts, history, state = self._load(user_id)
+        hold = self.tools.hold_slot(old["provider_id"], old["slot"])
+        if hold["price"] > facts.get("budget", 0):
+            return self._result(user_id, facts, history, state, "blocked", "The new quote exceeds your budget. No booking was made.")
+        state["holds"] = {hold["hold_id"]: {"provider_id": old["provider_id"], "slot": old["slot"], "price": hold["price"]}}
+        proposal = {"user_id": user_id, "hold_id": hold["hold_id"], "provider_id": old["provider_id"],
+                    "slot": old["slot"], "price": hold["price"]}
+        new_id = self.dispatcher.propose(proposal)
+        with sqlite3.connect(self.db) as conn:
+            # A redelivered provider-cancel event must see the live replacement, not the expired action.
+            conn.execute("UPDATE replacement_events SET action_id = ? WHERE action_id = ?", (new_id, old_id))
+        self.dispatcher._log("hold_reproposed", "", old_action_id=old_id, new_action_id=new_id,
+                             old_price=old["price"], new_price=hold["price"])
+        with SqliteSaver.from_conn_string(str(self.checkpoints)) as saver:
+            build_graph(self.dispatcher, saver).invoke(
+                {"action_id": new_id}, {"configurable": {"thread_id": new_id}}, durability="sync"
+            )
+        message = f"That hold expired. New hold: {old['provider_id']} at {old['slot']} for ₹{hold['price']} (was ₹{old['price']}). Approve?"
+        return self._result(user_id, facts, history, state, "approval_required", message, action_id=new_id)
 
     def on_provider_cancelled(self, user_id: str, booking_id: str) -> dict:
         """Entry point for a simulated provider event, without a user message."""

@@ -24,6 +24,13 @@ class MemoryStore:
                 (user_id, key, value, source, int(source == "explicit")),
             )
 
+    def exists(self, user_id: str, key: str) -> bool:
+        """True if a row exists in any state, including forgotten."""
+        with sqlite3.connect(self.db) as conn:
+            return conn.execute(
+                "SELECT 1 FROM memories WHERE user_id = ? AND key = ?", (user_id, key)
+            ).fetchone() is not None
+
     def inspect(self, user_id: str) -> list[dict]:
         with sqlite3.connect(self.db) as conn:
             rows = conn.execute(
@@ -43,9 +50,11 @@ class MemoryStore:
 
     def forget(self, user_id: str, key: str) -> None:
         with sqlite3.connect(self.db) as conn:
-            conn.execute(
+            result = conn.execute(
                 "UPDATE memories SET forgotten = 1 WHERE user_id = ? AND key = ?", (user_id, key)
             )
+            if result.rowcount == 0:  # tombstone, so a later inference cannot create what the user already refused
+                conn.execute("INSERT INTO memories VALUES (?, ?, '', 'explicit', 0, 1)", (user_id, key))
 
     def confirm(self, user_id: str, key: str) -> None:
         with sqlite3.connect(self.db) as conn:
