@@ -101,3 +101,9 @@ def test_simulated_cancel_is_refused_while_an_approval_is_pending(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_hidden_attribute_wins_over_flex_layout():
+    from errand.web import PAGE
+
+    assert "[hidden]{display:none!important}" in PAGE
