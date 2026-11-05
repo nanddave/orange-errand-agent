@@ -8,7 +8,7 @@ from pathlib import Path
 from errand.agent import ChatAgent
 from errand.gate import ActionDispatcher, MockBookingProvider
 from errand.memory import MemoryStore
-from errand.model import ScriptedModel
+from errand.model import ReplayModel, ScriptedModel
 
 
 FACTS = {"service": "plumber", "area": "Indiranagar", "date_range": "2026-11-06", "budget": 1500}
@@ -306,6 +306,18 @@ def run_extra(name, root):
     if name in {"options_list_slots", "search_does_not_block_update", "model_sees_current_options",
                 "select_click_proposes_booking", "select_unoffered_slot_blocked", "all_missing_at_once"}:
         return run_flow(name, root)
+    if name == "recorded_claude_session":
+        agent, provider = setup(root, [], scenario="timeout_success")
+        agent.model = ReplayModel(Path(__file__).resolve().parent.parent / "cassettes" / "session.json")
+        first = agent.handle("nand", "Plumber for a leaking tap, tomorrow morning, under ₹1,500 in Indiranagar")
+        assert first["status"] == "ready" and first["options"]
+        second = agent.handle("nand", "Read the reviews for plumber-1, then hold its 9am slot and book it.")
+        assert second["status"] == "approval_required" and provider.book_call_count() == 0
+        result = agent.confirm(second["action_id"], True)
+        assert provider.booking_count() == 1 and provider.book_call_count() == 1
+        events = [json.loads(line)["event"] for line in (root / "trace.jsonl").read_text().splitlines()]
+        assert "review_flagged" in events and events.index("booking_timeout") < events.index("status_checked") < events.index("confirmed")
+        return result["status"]
     raise ValueError(name)
 
 
@@ -409,6 +421,7 @@ CASES = [
     ("model_sees_current_options", "approval_required", "Second turn prompt contains plumber-1 and exact slot; hold+book proposes; 0 book calls"),
     ("select_click_proposes_booking", "approval_required", "select() with no model proposes; 0 book calls until confirm, then exactly 1"),
     ("select_unoffered_slot_blocked", "blocked", "select() of a 10:00 slot never offered: 0 holds taken, 0 book calls"),
+    ("recorded_claude_session", "confirmed", "Real Claude conversation replayed offline from cassettes/session.json: injection flagged, timeout after success, status check, 1 booking, 1 book call"),
 ]
 
 

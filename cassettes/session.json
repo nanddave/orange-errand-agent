@@ -1,0 +1,172 @@
+[
+  {
+    "type": "tool",
+    "name": "update_request",
+    "input": {
+      "service": "plumber",
+      "area": "Indiranagar",
+      "date_range": "2026-11-07",
+      "budget": 1500,
+      "time_window": "morning",
+      "earliest_time": "06:00",
+      "latest_time": "12:00",
+      "preferences": "leaking tap"
+    },
+    "tool_use_id": "toolu_014X2noVUE939b49aBzCe93F",
+    "assistant_content": [
+      {
+        "id": "toolu_014X2noVUE939b49aBzCe93F",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "service": "plumber",
+          "area": "Indiranagar",
+          "date_range": "2026-11-07",
+          "budget": 1500,
+          "time_window": "morning",
+          "earliest_time": "06:00",
+          "latest_time": "12:00",
+          "preferences": "leaking tap"
+        },
+        "name": "update_request",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 1783,
+      "output_tokens": 228
+    }
+  },
+  {
+    "type": "tool",
+    "name": "search_providers",
+    "input": {
+      "service": "plumber",
+      "area": "Indiranagar",
+      "date_range": "2026-11-07"
+    },
+    "tool_use_id": "toolu_017YwuwDLKbiGa3XC7WNXyWx",
+    "assistant_content": [
+      {
+        "id": "toolu_017YwuwDLKbiGa3XC7WNXyWx",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "service": "plumber",
+          "area": "Indiranagar",
+          "date_range": "2026-11-07"
+        },
+        "name": "search_providers",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2112,
+      "output_tokens": 102
+    }
+  },
+  {
+    "type": "text",
+    "text": "I found two verified plumbers in Indiranagar with morning slots tomorrow (7 Nov):\n\n| | Price | Rating | Slots |\n|---|---|---|---|\n| **plumber-1** | \u20b91,400 | 4.7 | 9:00 AM, 11:00 AM |\n| **plumber-2** | \u20b91,500 | 4.6 | 9:00 AM, 11:00 AM |\n\nI'd pick plumber-1. It costs less and has the higher rating. Plumber-2's \u20b91,500 is exactly your limit, not under it.\n\nWhich provider and slot do you want? I'll hold it and then ask for your approval to book.",
+    "usage": {
+      "input_tokens": 2436,
+      "output_tokens": 288
+    }
+  },
+  {
+    "type": "tool",
+    "name": "get_provider",
+    "input": {
+      "provider_id": "plumber-1"
+    },
+    "tool_use_id": "toolu_01CPDu6XxhNpWL8YS9JzX1CN",
+    "assistant_content": [
+      {
+        "id": "toolu_01CPDu6XxhNpWL8YS9JzX1CN",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "provider_id": "plumber-1"
+        },
+        "name": "get_provider",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2079,
+      "output_tokens": 53
+    }
+  },
+  {
+    "type": "tool",
+    "name": "hold_slot",
+    "input": {
+      "provider_id": "plumber-1",
+      "slot": "2026-11-07T09:00:00+05:30"
+    },
+    "tool_use_id": "toolu_01VDYt4RdFCmwvQVsBhRwjtZ",
+    "assistant_content": [
+      {
+        "signature": "CAQSzQUKEAgTGAI4AUIIdGhpbmtpbmcSDDUKmCjn2aJOLxUlGhoM1B3QAMV2ZZQook18IjBnFc2olyihkjOL39GPF+PDZBjhIlmTKEEw5W55kWib7yYYqTMVDHfaYhvWi4udTFgq6gR8CJLIJyFwG84XCCSjLrzt2dGCclJQk82C4NGXEzslBCmbah5yEwrhBPPgStZeKevBIE8bVfKwYVDikrZAPCSyQNEKIx5iWLVv8NGolHRk5Nabg7TSUG/UFpkeFjwCeiApgHkIVthsksPPKdHFv9zp2cqkes2xu6xvFa4x6dwZRXtEQedmtEIucup1ArFk0O+hyP11+CgTVXNHSlpNpuee0GxaMfaJcmmG24EqZhebDGMhSaUGzmdjsh2irVdA5V2i6NT7XiJ0w+llUXc8EwjCzLdLe0qN8O+LD3vHXcGFUKffzizTDPFoW8aa0PYnQ4L+5G6fTrUx4G2xCXPGRXXlydPAO0b8edSRAiluA04bw86cAAlEidHVC28sD+h/4PTrO3uM/gNsrmt9VmDH1D52QfuwTyyZTEwy1Z7BkrYf0AHcxcosXqwIfOepQgqk501/khw3lzsbu1MT3fQeaj/WqJRD/6GL/DG+Gwq7vF1dggcft/r0DG7S5JKlFIF9AnuVVksx/9rZfD4768kXZFoseWMJWTtU+y4fsSLrVF+z3bICGOltpdcNj+OwtmxiafxPspo8tgFnGeFAI9DlxXZzWyJ7eHimi35Zi9IcA3WK8M3E5Nn2zyiTX9HgDY6TQBws9UxIuHLMmgp9mrDCHEE32baXKDIZwZpBwZeI1VtveD0lG9aBU2JiP9bKvGQojQANUMeJPsvIdhqBMW6hsXQO+wil5TBqnLPsZMinyN9H+7z4gY3pG/cJZQEpmE3NMXguKYRI9z6yKtlmTXHM7aub0ZALfQqLwPswbTA4PD8RinBTUDdbBDPcPk4YAQ==",
+        "thinking": "",
+        "type": "thinking"
+      },
+      {
+        "signature": "CAQSqQcKEQgTGAI4AUIJbmFycmF0aW9uEgyZo5+6EvtpV+liDvsaDFDcNe0w42WSroATBiIwV8H4aKYXc+lxpq5W9gG6Ep3qm9NtKfEZoLFbDr9z+uIdT6A4Z0kgnX1E5yImATWFKsUGh50ExRvN+9D9ATdYAkS4HJyvTjthswm2H6M05u7GfZMSxgv/692qXaid0EmjLE8ITOsdQ3XbCepdWpkVm2iDJs6/KLano5B4AMOEPhoPUx7eUZnC6O/DZ9I6+7a1wJSdNxuhotedffygAWZOyZppUY8Ylm7h+ROa4wCiWgRUKfIuP5zVCdA7oPzH2iIfMUywmlrpQPk5V8TPaQgMH+KuIqAYXqp1YxVnTDI1b3ySHr0GxdmXHyyAvHVJXxNfB/ZYiZU164STzK8uF87Ba3t0PLPZ0OZ4suVb4qLtcSb5/LKj0Dt6uAmmAlfzSppK4oUrGvtXuQ5o2FccLFO9mSmWEcYFZXEt8fYnaUS+Y7CXbWt1vywZ2zSPat/rHo7BwgJ0NEUMzgsShTuQ5lftIorUs9xmKlb4Xw7wmG3SsuxTA/1KlxuvnCXzDBQBhJaQsp7+5RYcQEPYgCbYd4kNMijymDcL53xgqqZqaM1rq8+nwll4BrieB/KofTcYob+RQ2uhTLgf8Md8d8yAqdz9tU+mQUwoOUx6YwbumBOKp7nT9W2m/GxevaNhdenutAAsDRQbgZNxbZ0LhMm426rNkYbYfzQI76u3TJswIyW94gvjutZIxCuWk5n2RwWxAIMYRgILQf8yG45k+4E3KKeYydMCNGP1fnlBU1JTjYYVLoBjqFYPGcmZiqMDj16FP82go3etS5oCPX+qkU2oTD0ZDWCqVIbOxhOEpaLeabYFY4WgUysx8N5WFrgSbbeSc5D5lujXMznVTG8TY6/fGhZsfz8h+4VFfea2ISxCRlTqGa9+qcN/zP1VAr07zNcheZ4eP3A2aVh5tU8qnUebYIEtJbb+9tx+N7yAOhmXVcP8CbUABlzhT2rjIswsOZ8x0ZZ0qLCkvYjeLQVZHI+iPvnAJAUC+lc/MfW2RengGbOBBK+/Ou4YVBc8739ipcYEgaPf8vi905E9ND8fnzqeg+zGgUERtgQV7So06OJ5m0CUUOuGtOPJIcGTgoR37OWLjMz4F7uEKL2HWg4M51FNAoKlJbRADEjmUEHqReV5tYx98sHJJ01GnSSWtrPbCrNiJtJJdSwURjRrQ+mPEkrBprE/EzpHiSjtdMWXGAE=",
+        "thinking": "",
+        "type": "thinking"
+      },
+      {
+        "id": "toolu_01VDYt4RdFCmwvQVsBhRwjtZ",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "provider_id": "plumber-1",
+          "slot": "2026-11-07T09:00:00+05:30"
+        },
+        "name": "hold_slot",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2248,
+      "output_tokens": 218
+    }
+  },
+  {
+    "type": "tool",
+    "name": "book",
+    "input": {
+      "hold_id": "fa4fb6b3-8c35-4b45-a7a0-fa51d6cfeee2",
+      "idempotency_key": "book-plumber-1-20261107-0900"
+    },
+    "tool_use_id": "toolu_01MGUGDWYixLYjt69qp7HbSk",
+    "assistant_content": [
+      {
+        "id": "toolu_01MGUGDWYixLYjt69qp7HbSk",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "hold_id": "fa4fb6b3-8c35-4b45-a7a0-fa51d6cfeee2",
+          "idempotency_key": "book-plumber-1-20261107-0900"
+        },
+        "name": "book",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2536,
+      "output_tokens": 116
+    }
+  }
+]

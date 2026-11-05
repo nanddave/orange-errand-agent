@@ -84,3 +84,10 @@ Offline scenarios use a scripted model, so these only appeared with Claude in th
 - **"Remember that I never want appointments before 10am" saved nothing.** The model did not know which key to use. Fix: the `memory_action` description names the keys (`global.earliest_time` as `HH:MM`, `global.preferred_area`, `<service>.technician`).
 - **"Same electrician as last time" looked in saved memory instead of booking history.** Fix: the `list_bookings` description and the prompt say "last time" and "my booking" mean booking history.
 - **Regression:** `tests/test_core_flow.py::test_free_text_preferences_do_not_discard_the_current_options` and `::test_tool_descriptions_steer_the_model_away_from_live_misroutes`, plus a repeat of the six live checks.
+
+## 19. A refused changed-after-display action could never be declined
+
+- **Observed:** found by the fault-injection fuzz. After `confirm(id, True)` was refused because the proposal changed after display, `confirm(id, False)` raised `PermissionError` too and the action stayed `proposed` forever. Nothing executed, but a user could not clear it, and the page refuses new requests while an action is pending.
+- **Cause:** LangGraph replays the earlier cached resume value (`approved: True`) when the same interrupt is resumed again, so the decline never reached the ledger.
+- **Fix:** a "no" on a proposed action is written to the ledger directly and never goes through the graph.
+- **Regression:** `tests/test_review_fixes.py::test_a_changed_action_can_still_be_declined`.

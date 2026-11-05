@@ -107,3 +107,18 @@ def test_hidden_attribute_wins_over_flex_layout():
     from errand.web import PAGE
 
     assert "[hidden]{display:none!important}" in PAGE
+
+
+def test_a_changed_action_can_still_be_declined(tmp_path):
+    agent, provider = setup(tmp_path, booking_steps())
+    shown = agent.handle("nand", PROMPT)
+    original = agent.dispatcher.current_proposal(shown["action_id"])
+    agent.dispatcher.change(shown["action_id"], {**original, "price": 9000})
+    try:
+        agent.confirm(shown["action_id"], True)
+    except PermissionError:
+        pass
+    else:
+        raise AssertionError("changed action used the old approval")
+    assert agent.confirm(shown["action_id"], False)["status"] == "not_approved"
+    assert agent.dispatcher.status(shown["action_id"]) == "not_approved" and provider.book_call_count() == 0

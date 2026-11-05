@@ -428,6 +428,10 @@ class ChatAgent:
         if status not in {"proposed", "pending"}:
             return {"status": status, "message": "Booking confirmed." if status == "confirmed" else status.replace("_", " ").capitalize() + "."}
         proposal = self.dispatcher.presented_proposal(action_id)
+        if not approved and status == "proposed":
+            # Declining never needs the graph; resuming it would replay an earlier cached "approved" answer.
+            self.dispatcher.decline(action_id)
+            return {"status": "not_approved", "message": "Not approved."}
         with SqliteSaver.from_conn_string(str(self.checkpoints)) as saver:
             result = build_graph(self.dispatcher, saver).invoke(
                 None if status == "pending" else Command(resume={"approved": approved, "proposal": proposal}),

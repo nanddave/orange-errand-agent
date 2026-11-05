@@ -1,5 +1,11 @@
 """Live tool-use model and deterministic offline replacement."""
 
+import copy
+import json
+import os
+import tempfile
+from pathlib import Path
+
 from anthropic import Anthropic
 
 
@@ -43,3 +49,52 @@ class AnthropicModel:
             "text": " ".join(block.text for block in response.content if block.type == "text"),
             "usage": usage,
         }
+
+
+class RecordingModel:
+    """Wraps a model and saves only its step dicts (never keys or headers) to a JSON cassette."""
+
+    def __init__(self, inner, path):
+        self.inner, self.path, self.steps = inner, Path(path), []
+        self.live = getattr(inner, "live", False)
+
+    def next(self, messages: list[dict], tools: list[dict]) -> dict:
+        step = self.inner.next(messages, tools)
+        self.steps.append(json.loads(json.dumps(step, default=str)))
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")
+        with os.fdopen(fd, "w") as handle:
+            json.dump(self.steps, handle, indent=2)
+        os.replace(tmp, self.path)
+        return step
+
+
+def _latest_hold_id(messages):
+    content = messages[-1]["content"] if messages else ""
+    if isinstance(content, list):
+        content = next((b.get("content") for b in content if b.get("type") == "tool_result"), "")
+    try:
+        return json.loads(content).get("hold_id")
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+class ReplayModel:
+    """Plays a recorded cassette back offline; `book` gets the current run's hold id."""
+    live = False
+
+    def __init__(self, path):
+        self.steps = iter(json.loads(Path(path).read_text()))
+
+    def next(self, messages: list[dict], tools: list[dict]) -> dict:
+        step = next(self.steps, None)
+        if step is None:
+            raise RuntimeError("cassette exhausted: the replayed conversation has no more recorded steps")
+        step = copy.deepcopy(step)
+        hold_id = _latest_hold_id(messages) if step.get("name") == "book" else None
+        if hold_id:
+            step["input"]["hold_id"] = hold_id
+            for block in step.get("assistant_content") or []:
+                if block.get("type") == "tool_use" and block.get("name") == "book":
+                    block["input"]["hold_id"] = hold_id
+        return step

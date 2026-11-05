@@ -7,6 +7,7 @@ A chat agent that books home-service errands against eight mock provider tools. 
 ```sh
 .venv/bin/python -m pytest -q        # unit tests plus all offline evals
 .venv/bin/python -m errand.evals     # regenerates EVAL_TABLE.md
+.venv/bin/python -m errand.fuzz --runs 500 --seed 1   # regenerates FUZZ_REPORT.md (must stay at 0 violations)
 .venv/bin/python -m errand.web --scripted --port 8766   # offline demo page
 .venv/bin/python -m errand.web --scenario timeout_success   # live model; key from env or untracked .env
 ```

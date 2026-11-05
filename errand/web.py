@@ -12,7 +12,7 @@ from errand.agent import ChatAgent, _slot_label
 from errand.evals import FACTS, SLOT, book_held, call
 from errand.gate import ActionDispatcher, MockBookingProvider
 from errand.memory import MemoryStore
-from errand.model import AnthropicModel, ScriptedModel
+from errand.model import AnthropicModel, RecordingModel, ReplayModel, ScriptedModel
 
 
 PAGE = r"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -82,7 +82,7 @@ def load_local_key(path: Path):
 
 def create_server(root: Path, *, scripted=False, scenario="timeout_success", port=8765, model=None):
     root.mkdir(parents=True, exist_ok=True)
-    if not scripted:
+    if not scripted and model is None:
         load_local_key(Path(__file__).resolve().parent.parent / ".env")
         if not os.getenv("ANTHROPIC_API_KEY"):
             raise RuntimeError("Set ANTHROPIC_API_KEY in the environment or a local .env file")
@@ -194,13 +194,27 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
     return server
 
 
+def build_model(args):
+    """Model for --replay/--record, or None for the default behaviour."""
+    if (args.scripted, bool(args.replay), bool(args.record)).count(True) > 1:
+        raise SystemExit("--scripted, --replay and --record are mutually exclusive")
+    if args.replay:
+        return ReplayModel(args.replay)
+    if args.record:
+        load_local_key(Path(__file__).resolve().parent.parent / ".env")
+        return RecordingModel(AnthropicModel(), args.record)
+    return None
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--scripted", action="store_true", help="offline interface check")
+    parser.add_argument("--replay", metavar="PATH", help="replay a recorded cassette offline")
+    parser.add_argument("--record", metavar="PATH", help="call the live model and record a cassette")
     parser.add_argument("--scenario", default="timeout_success")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     root = Path.cwd() / "runtime"
-    server = create_server(root, scripted=args.scripted, scenario=args.scenario, port=args.port)
+    server = create_server(root, scripted=args.scripted, model=build_model(args), scenario=args.scenario, port=args.port)
     print(f"Open http://127.0.0.1:{args.port}", flush=True)
     server.serve_forever()

@@ -6,7 +6,7 @@
 
 **Memory and trust.** Preferences are scoped to a user and marked explicit (user said so) or inferred (for example the area of a confirmed booking). Only current, confirmed, relevant preferences enter the prompt, so inferred ones stay out until the user confirms; users can inspect, correct, remember and forget. Forgotten facts, and old chat that might repeat them, are excluded, and inference never overwrites or revives a stored row. Selected memory is capped at 4 KB and the full model input is bounded. Reviews are untrusted data: the trace flags instruction-like text, and code, not the model, checks held slots, time, budget, booking ownership and approval. Model prose cannot claim success; the app renders verified outcomes.
 
-**Evidence.** JSONL records transitions, model calls, token usage and estimated cost, tool arguments, sanitized results, latency, sent context and outcomes. `EVAL_TABLE.md` is generated from 43 offline scenarios, and `pytest` fails if it is stale. `TIMEOUT_TRACE_LIVE.txt` is a raw real-model run; its decisive excerpt is:
+**Evidence.** JSONL records transitions, model calls, token usage and estimated cost, tool arguments, sanitized results, latency, sent context and outcomes. `EVAL_TABLE.md` is generated from 50 offline scenarios, one of them a recorded real-Claude session replayed from `cassettes/`, and `pytest` fails if it is stale. `TIMEOUT_TRACE_LIVE.txt` is a raw real-model run; its decisive excerpt is:
 
 | Event | Meaning |
 |---|---|

@@ -13,7 +13,7 @@ python3.11 -m venv .venv
 .venv/bin/python -m errand.evals
 ```
 
-`pytest` runs the unit tests and all 43 offline simulated-user scenarios, and fails if the committed `EVAL_TABLE.md` is stale. `python -m errand.evals` regenerates that table. Tests and evals need no API key.
+`pytest` runs the unit tests and all 50 offline simulated-user scenarios, and fails if the committed `EVAL_TABLE.md` is stale. `python -m errand.evals` regenerates that table. Tests and evals need no API key.
 
 ## Live demo (chat left, trace right)
 
@@ -35,10 +35,15 @@ Each trace line expands to its raw JSON. Review text is untrusted and is rendere
 ## Evidence
 
 - [Design note](DESIGN_NOTE.md): state, approval, idempotency, memory and trace excerpt.
-- [Generated eval table](EVAL_TABLE.md): 43 executed offline scenarios, each with the invariant it asserts.
+- [Generated eval table](EVAL_TABLE.md): 50 executed offline scenarios, each with the invariant it asserts.
 - [Real bugs](BUGS.md): observed failures, causes, fixes and regression tests.
 - [Live trace](TIMEOUT_TRACE_LIVE.txt): raw trace of a real-model run (Claude Sonnet 5.5) through timeout-after-success to verified booking.
 - [Scripted trace](TIMEOUT_TRACE.txt): the same flow with the scripted model, kept as a deterministic reference.
+
+## Reliability proof and recorded replay
+
+- [FUZZ_REPORT.md](FUZZ_REPORT.md): 500 seeded random conversations with injected faults (timeouts after success, status errors, expired holds, changed proposals, repeated confirms, restarts, provider cancellations, injected reviews). 3,492 events, 0 invariant violations. Regenerate with `python -m errand.fuzz --runs 500 --seed 1`; tests prove the checker catches deliberately broken code.
+- `cassettes/session.json` is a recorded real-Claude conversation. Replay it with no key: `python -m errand.web --replay cassettes/session.json`. Record a new one with `--record PATH` (needs a key).
 
 ## Contract and assumptions
 
