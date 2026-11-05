@@ -33,3 +33,21 @@ def test_provider_cancellation_triggers_notice_and_fresh_approval_without_user_p
     assert tools.booking_count() == 2
     assert chat.on_provider_cancelled("nand", old_booking["id"])["status"] == "already_handled"
     assert tools.booking_count() == 2
+
+
+def test_replacement_respects_active_not_before_time(tmp_path):
+    db = tmp_path / "business.sqlite"
+    tools = MockBookingProvider(db, scenario="success", user_id="nand")
+    old_hold = tools.hold_slot("plumber-1", "2026-11-06T09:00:00+05:30")
+    tools.book(old_hold["hold_id"], "old")
+    booking = tools.list_bookings("nand")[0]
+    chat = ChatAgent(db, tools, ActionDispatcher(db, tools, tmp_path / "trace.jsonl"), MemoryStore(db),
+                     ScriptedModel([{"type": "tool", "name": "update_request", "input": {
+                         "service": "plumber", "area": "Indiranagar", "date_range": "2026-11-06",
+                         "budget": 1700, "earliest_time": "10:00",
+                     }}, {"type": "text", "text": "Ready"}]))
+    chat.handle("nand", "A replacement must be after 10")
+    tools.provider_cancel(booking["id"])
+    notice = chat.on_provider_cancelled("nand", booking["id"])
+    assert notice["status"] == "approval_required"
+    assert "T11:00" in notice["message"]

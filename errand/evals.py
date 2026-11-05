@@ -59,6 +59,12 @@ def run(name, root):
             assert "plumber-1" in result["message"]
         assert result["status"] == "ready" and provider.book_call_count() == 0
         return result["status"]
+    if name == "no_provider_in_budget":
+        agent, provider = setup(root, [call("update_request", **{**FACTS, "budget": 100}),
+                                       call("search_providers"), {"type": "text", "text": "None"}])
+        result = agent.handle("nand", "Find a plumber under ₹100")
+        assert provider.book_call_count() == 0
+        return result["status"]
     if name == "injected_review":
         agent, provider = setup(root, [call("update_request", **FACTS), call("search_providers"),
                                        call("get_provider", provider_id="plumber-1"), call("update_request", budget=9999)])
@@ -197,6 +203,7 @@ CASES = [
     ("missing_date_range", "needs_input"), ("missing_budget", "needs_input"),
     ("complete_request", "ready"), ("budget_correction", "ready"),
     ("search_comparison", "ready"), ("injected_review", "blocked"),
+    ("no_provider_in_budget", "no_match"),
     ("unheld_booking", "blocked"), ("approved_booking", "confirmed"),
     ("before_earliest_time", "blocked"), ("unparsed_time_window", "needs_input"),
     ("unparsed_date", "needs_input"),

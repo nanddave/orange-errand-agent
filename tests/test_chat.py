@@ -257,6 +257,69 @@ def test_changed_proposal_after_display_cannot_use_old_approval_click(tmp_path):
     assert provider.book_call_count() == 0
 
 
+def test_area_correction_invalidates_old_search_results(tmp_path):
+    chat, provider = agent(tmp_path, [
+        {"type": "tool", "name": "update_request", "input": {
+            "service": "plumber", "area": "Indiranagar", "date_range": "2026-11-06", "budget": 1500,
+        }},
+        {"type": "tool", "name": "search_providers", "input": {}},
+        {"type": "text", "text": "Options"},
+        {"type": "tool", "name": "update_request", "input": {"area": "Koramangala"}},
+        {"type": "tool", "name": "hold_slot", "input": {
+            "provider_id": "plumber-1", "slot": "2026-11-06T09:00:00+05:30",
+        }},
+    ])
+    assert chat.handle("nand", "Find plumbers in Indiranagar")['status'] == "ready"
+    result = chat.handle("nand", "Actually, Koramangala")
+    assert result["status"] == "blocked"
+    assert chat.facts("nand")["area"] == "Koramangala"
+    assert provider.book_call_count() == 0
+
+
+def test_50_memories_and_long_history_send_only_current_relevant_context(tmp_path):
+    def inspect_prompt(messages, _tools):
+        prompt = json.dumps(messages)
+        assert len(prompt.encode()) < 16000
+        assert "Indiranagar" in prompt
+        assert "forgotten-person" not in prompt
+        assert "unconfirmed-person" not in prompt
+        assert "electrician-only" not in prompt
+        assert "old-conversation-secret" not in prompt
+        return {"type": "text", "text": "Ready"}
+
+    chat, _ = agent(tmp_path, [inspect_prompt])
+    for index in range(55):
+        chat.memory.put("nand", f"electrician.fact_{index}", "electrician-only", source="explicit")
+    chat.memory.put("nand", "plumber.area", "Indiranagar", source="explicit")
+    chat.memory.put("nand", "plumber.technician", "unconfirmed-person", source="inferred")
+    chat.memory.put("nand", "plumber.old_technician", "forgotten-person", source="explicit")
+    chat.memory.forget("nand", "plumber.old_technician")
+    history = [{"role": "user", "content": "old-conversation-secret " * 1000}]
+    with sqlite3.connect(chat.db) as conn:
+        conn.execute("INSERT INTO sessions VALUES (?, ?, ?, ?)",
+                     ("nand", json.dumps({"service": "plumber", "area": "Indiranagar",
+                                         "date_range": "2026-11-06", "budget": 1500}),
+                      json.dumps(history), json.dumps({})))
+    assert chat.handle("nand", "Show current options")["status"] == "ready"
+    trace = [json.loads(line) for line in chat.dispatcher.trace.read_text().splitlines()]
+    sent = next(event for event in trace if event["event"] == "context_sent")
+    assert "Indiranagar" in sent["context"] and sent["bytes"] <= 4000
+
+
+def test_no_provider_within_budget_reports_no_match(tmp_path):
+    chat, provider = agent(tmp_path, [
+        {"type": "tool", "name": "update_request", "input": {
+            "service": "plumber", "area": "Indiranagar", "date_range": "2026-11-06", "budget": 100,
+        }},
+        {"type": "tool", "name": "search_providers", "input": {}},
+        {"type": "text", "text": "None"},
+    ])
+    result = chat.handle("nand", "Plumber under ₹100")
+    assert result["status"] == "no_match"
+    assert "no providers" in result["message"].lower()
+    assert provider.book_call_count() == 0
+
+
 def test_user_can_inspect_correct_and_forget_memory_through_chat(tmp_path):
     chat, _ = agent(tmp_path, [
         {"type": "tool", "name": "memory_action", "input": {"action": "inspect"}},

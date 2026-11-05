@@ -44,3 +44,17 @@ Record an issue here only after it is reproduced. For each: observed failure, ro
 - **Fix:** persist the presented proposal separately and require it to match both the current proposal and the confirmation payload. A material change needs a new presented action.
 - **Regression:** `tests/test_chat.py::test_changed_proposal_after_display_cannot_use_old_approval_click`; three offline eval rows also cover price, provider, and slot.
 
+## 7. Area correction reused stale search results
+
+- **Observed:** `test_area_correction_invalidates_old_search_results` failed because a hold for an Indiranagar search remained available after the user changed the area to Koramangala.
+- **Cause:** updating structured facts did not clear cached candidates and holds from the previous request.
+- **Fix:** invalidate candidates and holds whenever a request fact changes; recheck budget and time before proposing a booking.
+- **Regression:** `tests/test_chat.py::test_area_correction_invalidates_old_search_results`.
+
+## 8. Proactive replacement ignored active time preference
+
+- **Observed:** `test_replacement_respects_active_not_before_time` selected a 09:00 replacement despite the active request saying not before 10:00.
+- **Cause:** the cancellation handler checked only a global memory preference, bypassing the normal slot filter.
+- **Fix:** use the same time-constraint check as the search and hold path.
+- **Regression:** `tests/test_proactive.py::test_replacement_respects_active_not_before_time`.
+

@@ -183,6 +183,8 @@ class ChatAgent:
                 if candidates:
                     options = "; ".join(f"{item['id']} ₹{item['price']} ({item['rating']}★)" for item in candidates)
                     message = f"Options: {options}. Which provider and slot would you like? No booking has been made."
+                elif state.get("searched"):
+                    return self._result(user_id, facts, history, state, "no_match", "I found no providers within your budget and time window. No booking has been made.")
                 else:
                     message = "I have the request details. I can search providers when you're ready. No booking has been made."
                 return self._result(user_id, facts, history, state, "ready", message)
@@ -225,7 +227,12 @@ class ChatAgent:
                             return self._result(user_id, facts, history, state, "blocked", "Please use a valid HH:MM time. No booking was made.")
                 if args.get("time_window") and not any(word in args["time_window"].lower() for word in ("morning", "afternoon", "evening")) and not (args.get("earliest_time") or args.get("latest_time") or facts.get("earliest_time") or facts.get("latest_time")):
                     return self._result(user_id, facts, history, state, "needs_input", "What is your earliest or latest acceptable time in HH:MM?")
-                facts.update({key: value for key, value in args.items() if key in {"service", "area", "date_range", "time_window", "earliest_time", "latest_time", "budget", "preferences"} and value is not None})
+                updates = {key: value for key, value in args.items() if key in {"service", "area", "date_range", "time_window", "earliest_time", "latest_time", "budget", "preferences"} and value is not None}
+                if any(facts.get(key) != value for key, value in updates.items()):
+                    state.pop("candidates", None)
+                    state.pop("holds", None)
+                    state.pop("searched", None)
+                facts.update(updates)
                 missing = [key for key in REQUIRED if not facts.get(key)]
                 if missing:
                     return self._result(user_id, facts, history, state, "needs_input", f"What {missing[0].replace('_', ' ')} should I use?")
@@ -240,6 +247,7 @@ class ChatAgent:
                           if item["price"] <= facts["budget"]]
                 result = [item for item in result if item["slots"]]
                 state["candidates"] = result
+                state["searched"] = True
             elif name == "get_provider":
                 saw_provider_data = True
                 if args.get("provider_id") not in {item["id"] for item in state.get("candidates", [])}:
@@ -255,7 +263,7 @@ class ChatAgent:
                     return self._result(user_id, facts, history, state, "blocked", "The quoted price exceeds your budget. No booking was made.")
             elif name == "book":
                 hold = state.get("holds", {}).get(args.get("hold_id"))
-                if hold is None:
+                if hold is None or hold["price"] > facts.get("budget", 0) or not self._time_allowed(user_id, facts, hold["slot"]):
                     return self._result(user_id, facts, history, state, "blocked", "That slot was not held in this conversation. No booking was made.")
                 proposal = {"user_id": user_id, "hold_id": args["hold_id"], **hold}
                 action_id = self.dispatcher.propose(proposal)
@@ -327,16 +335,11 @@ class ChatAgent:
         budget = facts.get("budget")
         if not area or not budget:
             return self._result(user_id, facts, history, state, "needs_input", "Your provider cancelled. Tell me your preferred area and budget so I can find a replacement.")
-        earliest = next(
-            (item["value"] for item in self.memory.inspect(user_id)
-             if item["key"] == "global.earliest_time" and item["confirmed"]),
-            "00:00",
-        )
         candidates = self.tools.search_providers(booking["service"], area, booking["slot"][:10])
         alternatives = [
             (item, slot) for item in candidates if item["id"] != booking["provider"]
             and item["price"] <= budget for slot in item["slots"]
-            if slot[11:16] >= earliest
+            if self._time_allowed(user_id, facts, slot)
         ]
         if not alternatives:
             return self._result(user_id, facts, history, state, "no_replacement", "Your provider cancelled. I found no replacement within your known preferences.")

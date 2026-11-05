@@ -13,7 +13,7 @@ python3.11 -m venv .venv
 .venv/bin/python -m errand.evals
 ```
 
-The eval command rewrites `EVAL_TABLE.md` from 33 offline simulated-user scenarios. Tests and evals require no API key. `TIMEOUT_TRACE.txt` is a raw end-to-end scripted chat/booking trace showing timeout after success.
+The eval command rewrites `EVAL_TABLE.md` from 34 offline simulated-user scenarios. Tests and evals require no API key. `TIMEOUT_TRACE.txt` is a raw end-to-end scripted chat/booking trace showing timeout after success.
 
 For the local chat and trace page, place your own Anthropic key in the environment or in an untracked `.env` file containing `ANTHROPIC_API_KEY=...`. The key is read server-side and never sent to the page. The app reserves at most 20 live model calls per runtime database, limits each request's input size, and caps each model output at 512 tokens. Use a dedicated Anthropic workspace with a small spend limit as the authoritative cost cap. Start the live model with:
 
@@ -28,7 +28,7 @@ The mock tool return shapes are JSON objects/lists: search returns 3 providers w
 ## Evidence
 
 - [Design note](DESIGN_NOTE.md): state, approval, idempotency, memory and trace excerpt.
-- [Generated eval table](EVAL_TABLE.md): 33 executed offline scenarios.
+- [Generated eval table](EVAL_TABLE.md): 34 executed offline scenarios.
 - [Real bugs](BUGS.md): observed failures, causes, fixes and regression tests.
 - [Raw timeout trace](TIMEOUT_TRACE.txt): one scripted chat through verified booking.
 - [Project plan](PID.md): original requirements and acceptance checklist.
