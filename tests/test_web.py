@@ -123,6 +123,49 @@ def test_page_has_new_strings_and_no_innerhtml():
     assert "innerHTML" not in PAGE and "insertAdjacentHTML" not in PAGE
 
 
+def test_page_has_waiting_summary_and_readable_time_function():
+    for text in ["Thinking", "Working on it", "Last run:", "readableTimes", "id=\"runsum\""]:
+        assert text in PAGE, text
+    assert "innerHTML" not in PAGE and "insertAdjacentHTML" not in PAGE
+
+
+def test_trace_and_page_stay_live_while_chat_is_in_flight_and_second_post_is_409(tmp_path):
+    started, release = threading.Event(), threading.Event()
+
+    def slow(messages, tools):
+        started.set()
+        release.wait(10)
+        return {"type": "text", "text": "Hello"}
+
+    server = create_server(tmp_path, scripted=True, port=0, model=ScriptedModel([slow]))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def post(text):
+        request = Request(base + "/chat", json.dumps({"text": text}).encode(), {"Content-Type": "application/json"})
+        with urlopen(request, timeout=15) as response:
+            return json.load(response)
+
+    first = {}
+    worker = threading.Thread(target=lambda: first.update(post("plumber")), daemon=True)
+    try:
+        worker.start()
+        assert started.wait(5)
+        for path in ["/trace", "/pending", "/"]:
+            with urlopen(base + path, timeout=1) as response:
+                assert response.status == 200
+        with pytest.raises(HTTPError) as error:
+            post("again")
+        assert error.value.code == 409
+        assert json.load(error.value) == {"error": "Still working on your last request. Please wait."}
+    finally:
+        release.set()
+        worker.join(timeout=10)
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+    assert first.get("message")
+
+
 def _ready_server(tmp_path):
     steps = [call("update_request", **FACTS), call("search_providers"), {"type": "text", "text": "Ready"}]
     server = create_server(tmp_path, scripted=True, scenario="success", port=0, model=ScriptedModel(steps))

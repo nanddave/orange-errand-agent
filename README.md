@@ -47,3 +47,15 @@ Mock return shapes are JSON objects/lists: search returns 3 providers with `id`,
 `estimated_usd` in the trace uses assumed rates of $2 per million input tokens and $10 per million output tokens. It is an estimate, not billing data.
 
 Before sharing this folder, remove `.env` or share the repository with `git clone`/`git archive` only.
+
+## No API key? Run it offline
+
+`python -m errand.web --scripted --port 8766` runs the whole page with a scripted model and the same approval and booking code, so reviewers can try it without a key. `.env.example` shows the live-model setting. `pytest` and the evals never call the API.
+
+## Known limits
+
+- One demo user (`demo`); no sign-in. The provider is a local mock with fixed prices and slots.
+- The page keeps its "pending approval" pointer in server memory and restores it from the database on reload; it is built for one browser tab.
+- Live-model replies take about 10–20 seconds because the model makes several tool calls in turn.
+- Model picks can still vary between runs; code checks every tool argument, so a wrong pick is blocked or asks again rather than booking.
+- Cost figures are estimates from assumed per-token rates.

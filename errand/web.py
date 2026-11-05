@@ -4,7 +4,8 @@ import argparse
 import json
 import os
 import sqlite3
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from errand.agent import ChatAgent, _slot_label
@@ -14,32 +15,36 @@ from errand.memory import MemoryStore
 from errand.model import AnthropicModel, ScriptedModel
 
 
-PAGE = """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+PAGE = r"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Orange Errand Agent</title><style>
 body{font:15px system-ui,sans-serif;margin:0;background:#f7f8fa;color:#17212b}header{background:#fff;border-bottom:1px solid #ddd;padding:16px 24px}h1{font-size:20px;margin:0}main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;height:calc(100vh - 150px);box-sizing:border-box}section{display:flex;flex-direction:column;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden;min-height:0}h2{font-size:15px;margin:0;padding:14px;border-bottom:1px solid #eee}.body{padding:16px;overflow:auto;flex:1;white-space:pre-wrap}.bubble{padding:10px 13px;border-radius:10px;margin:0 0 10px;max-width:90%}.you{background:#e9f1fb;margin-left:auto}.agent{background:#fff3e7}[hidden]{display:none!important}form,.actions{display:flex;gap:8px;padding:12px;border-top:1px solid #eee}.actions{flex-wrap:wrap}#proposal{width:100%;white-space:pre-wrap}input[type=text]{flex:1;padding:10px;font:inherit}button{padding:10px 14px;background:#e67722;color:white;border:0;border-radius:7px;cursor:pointer}button.secondary{background:#596675}button:disabled{opacity:.5;cursor:default}pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;padding:8px;background:#f5f6f8;border-radius:5px}.ev{white-space:normal;margin:0 0 6px;font-size:13px;word-break:break-word}.ev summary{cursor:pointer}.ev.red{color:#b42318}.ev.green{color:#067647}.ev.amber{color:#b54708}.tag{font-weight:700;font-size:11px;margin-right:6px}.how{background:#fff3e7;padding:8px 24px;font-size:13px;border-bottom:1px solid #eee}.legend{font-size:12px;color:#596675;padding:8px 14px;border-bottom:1px solid #eee}.choices{white-space:normal;margin:0 0 10px}.choices .card{border:1px solid #ddd;border-radius:8px;padding:8px;margin:0 0 8px}.choices button{margin:4px 6px 0 0}.top{display:flex;justify-content:space-between;align-items:center}.cap{font-size:12px;color:#596675;margin:4px 0 0}@media(max-width:750px){main{grid-template-columns:1fr;height:auto}section{height:45vh}}
-</style><header><div class="top"><h1>Orange Errand Agent · local demo</h1><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="actions" class="actions" hidden><div id="proposal"></div><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked with the provider · UNCERTAIN = outcome not known yet<br><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="trace" class="body" aria-live="polite"></div></section></main>
+</style><header><div class="top"><h1>Orange Errand Agent · local demo</h1><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="actions" class="actions" hidden><div id="proposal"></div><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked with the provider · UNCERTAIN = outcome not known yet<br><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
 <script>
 let pending=null;const chat=document.getElementById('chat'),trace=document.getElementById('trace'),actions=document.getElementById('actions'),tech=document.getElementById('tech');
-function bubble(text,kind){const d=document.createElement('div');d.className='bubble '+kind;d.textContent=text;chat.append(d);chat.scrollTop=chat.scrollHeight}
-async function post(path,data){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});return r.json()}
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function readableTimes(s){return String(s).replace(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g,(m,y,mo,d,h,mi)=>{const hh=+h;return DAYS[new Date(Date.UTC(+y,+mo-1,+d)).getUTCDay()]+' '+(+d)+' '+MONTHS[+mo-1]+', '+(hh%12||12)+':'+mi+' '+(hh<12?'AM':'PM')})}
+function bubble(text,kind){const d=document.createElement('div');d.className='bubble '+kind;d.textContent=kind==='agent'?readableTimes(text):text;chat.append(d);chat.scrollTop=chat.scrollHeight;return d}
+let timer=null;function poll(ms){clearInterval(timer);timer=setInterval(refresh,ms)}
+function setBusy(on){for(const n of document.querySelectorAll('button,#message'))n.disabled=on}
+async function run(path,data,label){setBusy(true);poll(1000);const wait=bubble(label,'agent');let out;try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});out=await r.json()}catch(e){out={message:'Could not reach the assistant. Please try again.',status:'error'}}finally{wait.remove();setBusy(false);poll(3000)}show(out)}
 function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
 function clearChoices(){for(const n of chat.querySelectorAll('.choices'))n.remove()}
 function chipBox(){clearChoices();const d=el('div','','choices');chat.append(d);return d}
 function chip(box,label,onclick){const b=el('button',label,'secondary');b.type='button';b.onclick=()=>{clearChoices();onclick()};box.append(b)}
-async function send(text){bubble(text,'you');show(await post('/chat',{text}))}
+function send(text){bubble(text,'you');return run('/chat',{text},'Thinking…')}
 const STARTS=['Plumber for a leaking tap, tomorrow morning, under ₹1,500 in Indiranagar','Electrician to fix a tripping switchboard, today evening, under ₹2,000 in Koramangala','AC servicing for 2 split ACs, tomorrow, under ₹2,000 in JP Nagar'];
 const MISSING={area:['Area',[['Indiranagar','Indiranagar'],['Koramangala','Koramangala'],['JP Nagar','JP Nagar']]],date_range:['Date',[['Today','today'],['Tomorrow','tomorrow']]],budget:['Budget',[['₹1,000','₹1,000'],['₹1,500','₹1,500'],['₹2,000','₹2,000']]],service:['Service',[['Plumber','plumber'],['Electrician','electrician'],['AC servicing','AC servicing']]]};
 function startChips(){const box=chipBox();for(const t of STARTS)chip(box,t,()=>send(t))}
 function missingChips(missing){const box=chipBox();for(const key of missing){const m=MISSING[key==='date'?'date_range':key];if(!m)continue;for(const [label,value] of m[1])chip(box,label,()=>send(m[0]+': '+value))}}
-function optionCards(options){const box=chipBox();for(const o of options){const card=el('div','','card');card.append(el('b',o.name),el('div','Rating '+o.rating+' · ₹'+o.price));for(const s of o.slots){const b=el('button',s.label);b.type='button';b.onclick=async()=>{clearChoices();show(await post('/select',{provider_id:o.provider_id,slot:s.value}))};card.append(b)}box.append(card)}}
+function optionCards(options){const box=chipBox();for(const o of options){const card=el('div','','card');card.append(el('b',o.name),el('div','Rating '+o.rating+' · ₹'+o.price));for(const s of o.slots){const b=el('button',s.label);b.type='button';b.onclick=()=>{clearChoices();run('/select',{provider_id:o.provider_id,slot:s.value},'Thinking…')};card.append(b)}box.append(card)}}
 const RED=new Set(['run_error','model_error','web_error','not_approved','status_error']),SKIP=new Set(['event','action_id']);
 const T=(tag,text,tone)=>({tag,text,tone:tone||''});
 function plain(i){const a=i.arguments||{},r=i.result;switch(i.event){
 case 'tool_call':if(i.tool==='update_request'){const p=[a.service,a.area,a.date_range,a.budget?'up to ₹'+a.budget:null].filter(Boolean);return T('AI','Understood your request: '+p.join(' · '))}if(i.tool==='get_provider')return T('PROVIDER','Read reviews of '+a.provider_id);return null;
 case 'tool_result':if(i.tool==='search_providers')return T('PROVIDER','Searched and found '+(Array.isArray(r)?r.length:0)+' providers');if(i.tool==='hold_slot')return T('PROVIDER','Held the slot for 10 minutes at ₹'+(r&&r.price));return null;
 case 'review_flagged':return T('SAFETY',"Flagged a risky review and ignored it: '"+i.excerpt+"'",'amber');
-case 'select_clicked':return T('YOU','You picked '+i.provider_id+' at '+String(i.slot).slice(0,16).replace('T',' '));
-case 'proposed':return T('APPROVAL','Asked for your approval');
+case 'select_clicked':return T('YOU','You picked '+i.provider_id+' at '+readableTimes(i.slot));
+case 'proposed':return null;
 case 'approved':return T('YOU','You approved','green');
 case 'book_call':return T('PROVIDER','Sent the booking request');
 case 'booking_timeout':return T('UNCERTAIN',"The provider didn't answer in time, so the outcome is unknown",'amber');
@@ -52,16 +57,17 @@ case 'run_outcome':if(i.status==='approval_required')return T('APPROVAL','Asked 
 default:if(RED.has(i.event))return T('ERROR',i.message||i.error||i.event,'red');return null}}
 function summary(i){const parts=[];for(const [k,v] of Object.entries(i)){if(SKIP.has(k))continue;let t=typeof v==='object'&&v!==null?JSON.stringify(v):String(v);if(t.length>80)t=t.slice(0,80)+'…';parts.push(k+'='+t)}return parts.join(' ')}
 function row(i){const p=plain(i);if(!p&&!tech.checked)return null;const d=el('details','','ev '+(p?p.tone:'')),s=document.createElement('summary');if(p)s.append(el('span',p.tag,'tag'),p.text);else s.append(el('b',i.event),' '+summary(i));d.append(s,el('pre',JSON.stringify(i,null,2)));return d}
-async function refresh(){const r=await fetch('/trace');const items=await r.json();trace.replaceChildren(...items.map(row).filter(Boolean));trace.scrollTop=trace.scrollHeight}
+function runSummary(items){let k=items.map(i=>i.event).lastIndexOf('run_started');const m=items.slice(k<0?0:k).filter(i=>i.event==='model_call'),box=document.getElementById('runsum');if(!m.length){box.textContent='Last run: waiting';return}const u=x=>x.usage||{},t=m.reduce((a,x)=>a+(u(x).input_tokens||0)+(u(x).output_tokens||0),0),c=m.filter(x=>typeof x.estimated_usd==='number'),s=m.reduce((a,x)=>a+(x.latency_ms||0),0)/1000;box.textContent='Last run: '+m.length+' model calls · '+t+' tokens · '+(c.length?'about $'+c.reduce((a,x)=>a+x.estimated_usd,0).toFixed(3)+' (estimated)':'cost n/a')+' · model time '+s.toFixed(1)+' s'}
+async function refresh(){const r=await fetch('/trace');const items=await r.json();runSummary(items);trace.replaceChildren(...items.map(row).filter(Boolean));trace.scrollTop=trace.scrollHeight}
 tech.onchange=refresh;
 const WORDS={book:['Approve this booking?','Yes, book it'],cancel:['Approve cancelling this booking?','Yes, cancel it'],reschedule:['Approve rescheduling this booking?','Yes, reschedule']};
 function renderPending(p){document.getElementById('simbox').hidden=!p.has_confirmed;if(!p.action_id){pending=null;actions.hidden=true;return}pending=p.action_id;const q=p.proposal||{},w=WORDS[q.action]||WORDS.book,wait=p.status==='pending';document.getElementById('proposal').textContent=(wait?'Waiting for the provider. Check the booking status.':w[0])+' Provider: '+q.provider_id+' · Time: '+q.slot_label+' · Price: ₹'+q.price;document.getElementById('approve').textContent=wait?'Check booking status':w[1];document.getElementById('deny').hidden=wait;actions.hidden=false}
 async function syncPending(){renderPending(await (await fetch('/pending')).json())}
 function show(result){clearChoices();bubble(result.message||result.error||result.status,'agent');pending=result.status==='approval_required'?result.action_id:null;actions.hidden=!pending;if(result.options&&result.options.length)optionCards(result.options);else if(result.missing&&result.missing.length)missingChips(result.missing);syncPending();refresh()}
 document.getElementById('form').onsubmit=async e=>{e.preventDefault();const input=document.getElementById('message'),value=input.value.trim();if(!value)return;input.value='';send(value)};
-for(const [id,approved] of [['approve',true],['deny',false]])document.getElementById(id).onclick=async()=>{if(pending)show(await post('/approve',{action_id:pending,approved}))};
-document.getElementById('simcancel').onclick=async()=>{const r=await fetch('/simulate-provider-cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),d=await r.json();show(r.ok?d:{message:d.error,status:'error'})};
-refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(p.action_id)bubble(p.message,'agent');else startChips()});setInterval(refresh,3000);
+for(const [id,approved] of [['approve',true],['deny',false]])document.getElementById(id).onclick=()=>{if(pending)run('/approve',{action_id:pending,approved},'Working on it…')};
+document.getElementById('simcancel').onclick=()=>run('/simulate-provider-cancel',{},'Working on it…');
+refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(p.action_id)bubble(p.message,'agent');else startChips()});poll(3000);
 </script></html>"""
 
 
@@ -93,6 +99,8 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
     with sqlite3.connect(db) as conn:
         rows = conn.execute("SELECT id, proposal FROM actions WHERE status IN ('proposed', 'pending') ORDER BY rowid DESC").fetchall()
     pending["action_id"] = next((action_id for action_id, proposal in rows if json.loads(proposal).get("user_id") == "demo"), None)
+
+    busy = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
         def send(self, code, data, content_type="application/json"):
@@ -132,6 +140,10 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
             size = int(self.headers.get("Content-Length", "0"))
             if size < 1 or size > 24000:
                 return self.send(413, {"error": "request too large"})
+            if self.path not in {"/chat", "/select", "/approve", "/simulate-provider-cancel"}:
+                return self.send(404, {"error": "not found"})
+            if not busy.acquire(blocking=False):
+                return self.send(409, {"error": "Still working on your last request. Please wait."})
             try:
                 data = json.loads(self.rfile.read(size))
                 if self.path == "/chat":
@@ -174,8 +186,12 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                                     "message": "The provider outcome is still uncertain. Check status again; no second booking call will be made."})
                 else:
                     self.send(500, {"status": "error", "message": "The request could not be completed. Check the trace."})
+            finally:
+                busy.release()
 
-    return HTTPServer(("127.0.0.1", port), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server.daemon_threads = True
+    return server
 
 
 if __name__ == "__main__":
