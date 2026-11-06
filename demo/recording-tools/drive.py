@@ -159,7 +159,7 @@ try:
     pause(0.8)
     click("document.querySelector('[data-break=\"reviews\"]')", "Ask about reviews")
     click("document.querySelector('#breakbox summary')", "close Try to break it")
-    wait_for("document.getElementById('trace').innerText.includes('SAFETY') && document.getElementById('chat').innerText.includes('I read the provider reviews')", what="SAFETY row and reply")
+    wait_for("document.getElementById('trace').innerText.includes('SAFETY') && (()=>{const t=document.getElementById('chat').innerText,i=t.indexOf('looks off.');return i>=0&&t.length-i>120&&!t.includes('Thinking')})()", what="SAFETY row and reply")
     pause(10, "SAFETY row")
     shot("03-safety")
     # 4 pick slot

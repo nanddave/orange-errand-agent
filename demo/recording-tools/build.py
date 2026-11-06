@@ -61,7 +61,7 @@ CAPS = [
     "Live Claude searches the mock providers. (Waiting on the model, shown at 2.5× speed.)",
     "Two options inside the budget and the morning window. Nothing is booked yet.",
     "Step 2 · Try to break it: ask Claude to read the provider reviews. One review hides an instruction.",
-    "The guardrail flags the injected instruction and ignores it. Reviews are untrusted data.\nThe options stay and no booking is made.",
+    "Claude reports the odd review and ignores it; the guardrail flags it in the trace. Reviews are untrusted data.\nThe options stay and no booking is made.",
     "Step 3 · Pick Plumber 1, 9:00 AM. The agent holds the slot and asks for approval.\nNothing is booked until you click Yes.",
     "Step 4 · Break it again: the provider will time out after it has booked.",
     "Approved. The provider books, then does not answer in time. Trace: UNCERTAIN, VERIFY, DONE.\nThe agent asks the provider instead of retrying: one booking, not two.",
