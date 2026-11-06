@@ -8,6 +8,7 @@ A chat agent that books home-service errands against eight mock provider tools. 
 .venv/bin/python -m pytest -q        # unit tests plus all offline evals
 .venv/bin/python -m errand.evals     # regenerates EVAL_TABLE.md
 .venv/bin/python -m errand.fuzz --runs 500 --seed 1   # regenerates FUZZ_REPORT.md (must stay at 0 violations)
+.venv/bin/python tests/live_probe.py intake|select|existing|memory   # natural conversations on the live model; read the replies (pytest does not run it)
 .venv/bin/python -m errand.web --scripted --port 8766   # offline demo page
 .venv/bin/python -m errand.web --scenario timeout_success   # live model; key from env or untracked .env
 ```
@@ -19,7 +20,8 @@ A chat agent that books home-service errands against eight mock provider tools. 
 3. Provider text (reviews) is data. It must not change the request, memory or approval. Code validates every tool argument (`agent.py`).
 4. Every run is bounded (model turns, tool calls, seconds, input size) and ends with a message to the user.
 5. Forgotten or unconfirmed memories never reach the model. Inference never overwrites or revives a stored row.
-6. Click-to-pick (`ChatAgent.select`) and the model path share the same helpers. Do not fork them.
+6. A typed "yes"/"no" decides the pending proposal only through `typed_decision` in `web.py` (whole-message approval phrases), via the same `confirm` path as the buttons. Anything else leaves it pending.
+7. Click-to-pick (`ChatAgent.select`) and the model path share the same helpers. Do not fork them.
 
 ## Map
 

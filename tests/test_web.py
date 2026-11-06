@@ -123,6 +123,10 @@ def test_page_has_new_strings_and_no_innerhtml():
     assert "innerHTML" not in PAGE and "insertAdjacentHTML" not in PAGE
 
 
+def test_page_labels_the_fixed_offline_flow():
+    assert 'id="mode"' in PAGE and "/mode" in PAGE and "fixed plumbing flow" in PAGE
+
+
 def test_page_has_waiting_summary_and_readable_time_function():
     for text in ["Thinking", "Working on it", "Last run:", "readableTimes", "id=\"runsum\""]:
         assert text in PAGE, text
@@ -309,3 +313,41 @@ def test_chat_body_leaves_room_for_the_approval_card_and_input():
     from errand.web import PAGE
 
     assert "min-height:140px" in PAGE and "min-height:300px" not in PAGE
+
+
+def test_typed_yes_and_no_decide_the_pending_proposal_and_other_text_does_not(tmp_path):
+    from errand.web import typed_decision
+    for said in ("yes", "Yes, go ahead!", "ok book it now", "sure please", "approve", "That works"):
+        assert typed_decision(said) is True, said
+    for said in ("no", "No thanks", "don't", "no wait, make it 11", "never mind"):
+        assert typed_decision(said) is False, said
+    for said in ("yes but make it 11", "maybe later", "ok but cheaper", "", "what time is it?"):
+        assert typed_decision(said) is None, said
+
+    server = create_server(tmp_path, scripted=True, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def post(path, data):
+        with urlopen(Request(base + path, json.dumps(data).encode(), {"Content-Type": "application/json"})) as response:
+            return json.load(response)
+
+    try:
+        proposal = post("/chat", {"text": "Book plumber-1 on Friday morning under 1500"})
+        waiting = post("/chat", {"text": "yes but make it 11"})
+        assert waiting["status"] == "approval_required" and waiting["action_id"] == proposal["action_id"] and "yes" in waiting["message"].lower()
+        assert post("/chat", {"text": "yes please"})["status"] == "confirmed"
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+    (tmp_path / "second").mkdir()
+    other = create_server(tmp_path / "second", scripted=True, port=0)
+    other_thread = threading.Thread(target=other.serve_forever, daemon=True)
+    other_thread.start()
+    base = f"http://127.0.0.1:{other.server_address[1]}"
+    try:
+        assert post("/chat", {"text": "Book plumber-1 on Friday morning under 1500"})["status"] == "approval_required"
+        assert post("/chat", {"text": "no thanks"})["status"] == "not_approved"
+    finally:
+        other.shutdown(); other.server_close(); other_thread.join(timeout=2)

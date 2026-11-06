@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 import os
 import sqlite3
 import threading
@@ -90,7 +91,7 @@ pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;pad
 #breakstate{font-size:12px;color:var(--warn);margin-top:4px}
 @media(max-width:800px){main{grid-template-columns:1fr;height:auto}section{min-height:420px}#simbox{text-align:left}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style><header><div class="wrap top"><div><h1>Orange Errand Agent</h1><p class="tagline">Book home services. You approve every step.<span class="demo">Local demo, mock providers</span></p></div><div class="right"><details id="breakbox"><summary>Try to break it</summary><div class="bar"><button class="secondary" type="button" data-break="timeout">Next booking: provider times out after booking</button><button class="secondary" type="button" data-break="price">Next hold: quote is ₹50 higher (needs fresh approval)</button><button class="secondary" type="button" data-break="reviews">Ask about reviews (one holds an injected instruction)</button><button class="secondary" type="button" data-break="normal">Back to normal</button></div><div id="breakstate"></div></details><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div></div><main><section><h2>Chat</h2><details id="intakebox"><summary>What do you need? Start with a short form</summary><form id="intake"><label>Service<input id="f-service" list="dl-service" required placeholder="Plumber"></label><label>Area<input id="f-area" list="dl-area" required placeholder="Indiranagar"></label><label>Day<select id="f-day" required><option value="" selected disabled>Choose a day</option><option value="0">Today</option><option value="1">Tomorrow</option><option value="pick">Pick a date</option></select></label><label>Time of day<select id="f-window"><option value="">Any time</option><option value="mornings only">Mornings only</option><option value="afternoons only">Afternoons only</option><option value="evenings only">Evenings only</option></select></label><label id="f-date-wrap" hidden>Date<input id="f-date" type="date"></label><label class="wide">Budget (₹)<input id="f-budget" type="number" min="1" max="100000" step="1" required placeholder="1500"></label><div class="presets wide" aria-label="Budget presets"><button type="button" class="secondary" data-budget="1000">₹1,000</button><button type="button" class="secondary" data-budget="1500">₹1,500</button><button type="button" class="secondary" data-budget="2000">₹2,000</button><button type="button" class="secondary" data-budget="3000">₹3,000</button></div><label class="wide">Details (optional)<input id="f-notes" type="text" placeholder="Kitchen tap is leaking"></label><div class="wide"><button id="f-go">Find options</button></div><datalist id="dl-service"><option value="Plumber"><option value="Electrician"><option value="AC servicing"></datalist><datalist id="dl-area"><option value="Indiranagar"><option value="Koramangala"><option value="JP Nagar"></datalist></form></details><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
+</style><header><div class="wrap top"><div><h1>Orange Errand Agent</h1><p class="tagline">Book home services. You approve every step.<span class="demo">Local demo, mock providers</span></p></div><div class="right"><details id="breakbox"><summary>Try to break it</summary><div class="bar"><button class="secondary" type="button" data-break="timeout">Next booking: provider times out after booking</button><button class="secondary" type="button" data-break="price">Next hold: quote is ₹50 higher (needs fresh approval)</button><button class="secondary" type="button" data-break="reviews">Ask about reviews (one holds an injected instruction)</button><button class="secondary" type="button" data-break="normal">Back to normal</button></div><div id="breakstate"></div></details><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes. <span id="mode">Live chat needs an API key.</span></div></div><main><section><h2>Chat</h2><details id="intakebox"><summary>What do you need? Start with a short form</summary><form id="intake"><label>Service<input id="f-service" list="dl-service" required placeholder="Plumber"></label><label>Area<input id="f-area" list="dl-area" required placeholder="Indiranagar"></label><label>Day<select id="f-day" required><option value="" selected disabled>Choose a day</option><option value="0">Today</option><option value="1">Tomorrow</option><option value="pick">Pick a date</option></select></label><label>Time of day<select id="f-window"><option value="">Any time</option><option value="mornings only">Mornings only</option><option value="afternoons only">Afternoons only</option><option value="evenings only">Evenings only</option></select></label><label id="f-date-wrap" hidden>Date<input id="f-date" type="date"></label><label class="wide">Budget (₹)<input id="f-budget" type="number" min="1" max="100000" step="1" required placeholder="1500"></label><div class="presets wide" aria-label="Budget presets"><button type="button" class="secondary" data-budget="1000">₹1,000</button><button type="button" class="secondary" data-budget="1500">₹1,500</button><button type="button" class="secondary" data-budget="2000">₹2,000</button><button type="button" class="secondary" data-budget="3000">₹3,000</button></div><label class="wide">Details (optional)<input id="f-notes" type="text" placeholder="Kitchen tap is leaking"></label><div class="wide"><button id="f-go">Find options</button></div><datalist id="dl-service"><option value="Plumber"><option value="Electrician"><option value="AC servicing"></datalist><datalist id="dl-area"><option value="Indiranagar"><option value="Koramangala"><option value="JP Nagar"></datalist></form></details><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
 <script>
 let pending=null;const chat=document.getElementById('chat'),trace=document.getElementById('trace'),actions=document.getElementById('actions'),tech=document.getElementById('tech');
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -171,7 +172,7 @@ document.getElementById('breakstate').textContent=out.status==='ok'?BREAK_NOTE[k
 document.getElementById('form').onsubmit=async e=>{e.preventDefault();const input=document.getElementById('message'),value=input.value.trim();if(!value)return;input.value='';send(value)};
 for(const [id,approved] of [['approve',true],['deny',false]])document.getElementById(id).onclick=()=>{if(pending)run('/approve',{action_id:pending,approved},'Working on it…')};
 document.getElementById('simcancel').onclick=()=>run('/simulate-provider-cancel',{},'Working on it…');
-restoreChat();refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(!p.action_id&&!chat.children.length)intakeBox.open=true});poll(3000);
+restoreChat();refresh();fetch('/mode').then(r=>r.json()).then(m=>{if(m.scripted)document.getElementById('mode').textContent='Offline check: this plays one fixed plumbing flow; run without --scripted for free-form chat.'});fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(!p.action_id&&!chat.children.length)intakeBox.open=true});poll(3000);
 </script></html>"""
 
 
@@ -182,6 +183,20 @@ def load_local_key(path: Path):
         if line.startswith("ANTHROPIC_API_KEY="):
             os.environ["ANTHROPIC_API_KEY"] = line.split("=", 1)[1].strip().strip('"\'')
             return
+
+
+YES = re.compile(r"(yes|yep|yeah|yup|sure|ok|okay|confirm|approve|go ahead|do it|book it|sounds good|looks good|that works)( (please|thanks|go ahead|do it|book it|confirm|now))*")
+NO = re.compile(r"(no|nope|nah|stop|don'?t|do not|never ?mind|not now|cancel that)\b.*")
+
+
+def typed_decision(text):
+    """True/False for a typed approval or refusal of the pending proposal, None for anything else. Approval must be the whole message; a refusal may carry a reason."""
+    said = re.sub(r"[^a-z' ]", "", text.lower()).strip()
+    if YES.fullmatch(said):
+        return True
+    if NO.fullmatch(said):
+        return False
+    return None
 
 
 def create_server(root: Path, *, scripted=False, scenario="timeout_success", port=8765, model=None):
@@ -229,6 +244,8 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
             if self.path == "/trace":
                 events = [json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []
                 return self.send(200, events[-100:])
+            if self.path == "/mode":
+                return self.send(200, {"scripted": scripted})
             if self.path == "/pending":
                 out = {"has_confirmed": any(b["status"] == "confirmed" for b in provider.list_bookings("demo"))}
                 action_id = pending["action_id"]
@@ -284,8 +301,13 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                 data = json.loads(raw)
                 if self.path == "/chat":
                     if pending["action_id"] and dispatcher.status(pending["action_id"]) in {"proposed", "pending"}:
-                        result = {"status": "approval_required", "action_id": pending["action_id"],
-                                  "message": "Resolve the pending action before starting a new request."}
+                        decision = typed_decision(data.get("text")) if type(data.get("text")) is str else None
+                        if decision is None:
+                            result = {"status": "approval_required", "action_id": pending["action_id"],
+                                      "message": "A request is waiting for your answer. Reply yes to approve it or no to drop it, or use the buttons."}
+                        else:  # same path as the Yes/No buttons: the approval still names the exact proposal the user saw
+                            result = agent.confirm(pending["action_id"], decision)
+                            pending["action_id"] = result.get("action_id") if result.get("status") == "approval_required" else None
                     else:
                         if type(data["text"]) is not str:
                             return self.send(400, {"error": "text must be a string"})

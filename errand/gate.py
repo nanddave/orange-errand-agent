@@ -5,6 +5,7 @@ import random
 import sqlite3
 import threading
 import time
+from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -47,11 +48,16 @@ class MockBookingProvider:
             conn.execute("CREATE TABLE IF NOT EXISTS cancel_attempts (key TEXT PRIMARY KEY, count INTEGER)")
 
     def search_providers(self, service: str, area: str, date_range: str) -> list[dict]:
+        # shortcut: a range lists the first three days only (two slots a day); raise the cap if the UI should offer a whole week.
+        start, _, end = date_range.partition("/")
+        first = date.fromisoformat(start)
+        days = [(first + timedelta(days=n)).isoformat() for n in range(min((date.fromisoformat(end or start) - first).days + 1, 3))]
+        slots = [f"{day}T{hour}:00:00+05:30" for day in days for hour in ("09", "11")]
         return [
             {
                 "id": f"{service}-{number}", "service": service, "area": area,
                 "price": 1300 + number * 100, "rating": round(4.8 - number * 0.1, 1),
-                "slots": [f"{date_range}T09:00:00+05:30", f"{date_range}T11:00:00+05:30"],
+                "slots": slots,
                 "attributes": ["verified", "morning availability"],
             }
             for number in range(1, 4)
