@@ -80,3 +80,8 @@ def test_greeting_with_no_details_is_answered_and_still_lists_what_is_missing(tm
     result = agent.handle("nand", "hello")
     assert result["status"] == "needs_input" and result["message"].startswith("Hello! What do you need help with?")
     assert result["missing"] == ["service", "area", "date_range", "budget"]
+
+
+def test_form_has_no_default_day_and_page_explains_model_free_runs():
+    assert '<option value="" selected disabled>Choose a day</option>' in PAGE and 'id="f-day" required' in PAGE
+    assert "answered by code, no model call" in PAGE and "/^Options:/.test(msg)" in PAGE

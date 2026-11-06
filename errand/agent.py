@@ -55,9 +55,11 @@ TOOLS = [
 
 REQUIRED = ("service", "area", "date_range", "budget")
 # A question about an existing booking is answered from provider data in code, never by a model search.
-STATUS_QUESTION = re.compile(r"\b(confirm\w*|status|my bookings?|did it (go through|work)|is it booked)\b", re.I)
+STATUS_QUESTION = re.compile(
+    r"\b(confirm\w*|status|my bookings?|did it (go through|work)|is it booked|(did|have) i (already )?(book\w*|schedul\w*)|do i have (an? |any )?(booking|appointment)\w*|what bookings?|which (time|slot|provider)\b.*\b(book\w*|have))\b", re.I)
 CLAIM = re.compile(r"\b(confirmed|booked|cancel+ed|rescheduled)\b", re.I)  # words only code may use about an action
-ACTION_WORDS = re.compile(r"\b(book|find|search|look for|cancel|reschedule|move|change|same)\b", re.I)
+# A message that asks for something to be done (an imperative book, or any of these verbs) is never a status question.
+ACTION_WORDS = re.compile(r"(^\s*(please\s+)?book\b)|\b(find|search|look for|cancel|reschedule|move|change|same|another|new)\b", re.I)
 INSTRUCTION_LIKE = re.compile(
     r"ignore .*(instruction|budget|user|previous)|without approval|disregard|you must|system:|book this provider|do not ask",
     re.IGNORECASE,

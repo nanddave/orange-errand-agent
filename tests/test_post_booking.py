@@ -120,3 +120,16 @@ def test_reschedule_with_an_unparseable_time_is_blocked_before_any_proposal(tmp_
     result = agent.handle("nand", "Move my appointment")
     assert result["status"] == "blocked" and "action_id" not in result
     assert provider.list_bookings("nand")[0]["slot"] == booking["slot"]
+
+
+def test_which_time_did_i_book_is_a_status_question_but_book_requests_are_not(tmp_path):
+    from errand.agent import ACTION_WORDS, STATUS_QUESTION
+    for phrase in ["Which time did I book and with whom?", "what bookings do I have?", "did I book anything?", "Do I have an appointment?",
+                   "give me my booking confirmation"]:
+        assert STATUS_QUESTION.search(phrase) and not ACTION_WORDS.search(phrase), phrase
+    for phrase in ["Book the same electrician as last time", "Book another plumber", "Move my booking to Saturday", "find me a new plumber"]:
+        assert not (STATUS_QUESTION.search(phrase) and not ACTION_WORDS.search(phrase)), phrase
+    agent, provider, _ = booked(tmp_path)
+    agent.model = ScriptedModel([call("search_providers")])
+    result = agent.handle("nand", "Which time did I book and with whom?")
+    assert result["message"].startswith("Your bookings:") and len(list(agent.model.steps)) == 1
