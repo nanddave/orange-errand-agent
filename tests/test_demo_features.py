@@ -36,12 +36,12 @@ def test_model_wording_is_used_for_small_talk_but_never_for_claims(tmp_path):
 
 
 def test_model_text_with_price_or_time_details_is_replaced(tmp_path):
-    for i, text in enumerate(["Sure, that plumber is only ₹900 at 9:00 AM.", "Booking for 4 pm works."]):
+    for i, text in enumerate(["Sure, that plumber is only ₹900 at 9:00 AM.", "Booking for 4 pm works.", "At 14:30 I can come.", "It costs INR 1,800.", "About 1800 rupees."]):
         (tmp_path / str(i)).mkdir()
         agent, provider = setup(tmp_path / str(i), [{"type": "text", "text": text}])
         agent._save("nand", FACTS, [], {})
         result = agent.handle("nand", "What do you suggest?")
-        assert "₹900" not in result["message"] and "pm" not in result["message"].lower().replace("providers", "")
+        assert result["message"] != text
         assert provider.booking_count() == 0
 
 

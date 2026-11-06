@@ -57,13 +57,13 @@ REQUIRED = ("service", "area", "date_range", "budget")
 # A question about an existing booking is answered from provider data in code, never by a model search.
 STATUS_QUESTION = re.compile(
     r"\b(confirm\w*|status|my bookings?|did it (go through|work)|is it booked|(did|have) i (already )?(book\w*|schedul\w*)|do i have (an? |any )?(booking|appointment)\w*|what bookings?|which (time|slot|provider)\b.*\b(book\w*|have))\b", re.I)
-DETAIL = re.compile(r"₹\s?[\d,]+|\brs\.?\s*\d+|\b\d{1,2}(?::\d{2})?\s*[ap]\.?m\b", re.I)  # prices and clock times in model text
+DETAIL = re.compile(r"(?:₹|\binr|\brs\.?)\s*\d[\d,]*|\b\d[\d,]*\s*(?:inr|rupees)\b|\b\d{1,2}(?::\d{2})?\s*[ap]\.?m\b|\b(?:[01]?\d|2[0-3]):[0-5]\d\b(?!\s*[ap]\.?m)", re.I)  # prices and clock times in model text
 
 
 def _details_match(reply, candidates):
     """True if every price or time the model mentions is in the ledger's current options."""
     known = {str(c["price"]) for c in candidates} | {_slot_label(s).rpartition(", ")[2].lower().replace(" ", "") for c in candidates for s in c["slots"]}
-    return all(re.sub(r"[₹,\s]|rs\.?|\.", "", d.lower()) in known for d in DETAIL.findall(reply) or [])
+    return all(re.sub(r"[₹,\s]|inr|rupees|rs\.?|\.", "", d.lower()) in known for d in DETAIL.findall(reply) or [])
 CLAIM = re.compile(r"\b(confirmed|booked|cancel+ed|rescheduled)\b", re.I)  # words only code may use about an action
 # A message that asks for something to be done (an imperative book, or any of these verbs) is never a status question.
 ACTION_WORDS = re.compile(r"(^\s*(please\s+)?book\b)|\b(find|search|look for|cancel|reschedule|move|change|same|another|new)\b", re.I)
