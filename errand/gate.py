@@ -3,6 +3,7 @@
 import json
 import random
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -195,6 +196,7 @@ class ActionDispatcher:
         self.db = db
         self.provider = provider
         self.trace = trace
+        self._execute_lock = threading.Lock()
         with sqlite3.connect(db) as conn:
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS actions ("
@@ -274,6 +276,11 @@ class ActionDispatcher:
         self._log("changed", action_id)
 
     def execute(self, action_id: str) -> str:
+        # One executor at a time per process: concurrent confirms must not both reach the provider.
+        with self._execute_lock:
+            return self._execute(action_id)
+
+    def _execute(self, action_id: str) -> str:
         with sqlite3.connect(self.db) as conn:
             row = conn.execute(
                 "SELECT proposal, approved, status, key FROM actions WHERE id = ?", (action_id,)

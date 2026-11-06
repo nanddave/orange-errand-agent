@@ -118,6 +118,7 @@ class Sim:
     def say(self, steps, text):
         self.agent.model = ScriptedModel(steps)
         result = self.agent.handle(USER, text)
+        self.checks["UX"] += 1
         if result["status"] == "error":
             self.viol("UX", f"handle swallowed an internal error ({text})")
         if result["status"] == "approval_required":
@@ -126,6 +127,7 @@ class Sim:
 
     def attempt(self, fn, *, expect_perm=False, what=""):
         """Run an agent call; expected injected faults are counted, anything else is a violation."""
+        self.checks["UX"] += 1
         try:
             result = fn()
         except PermissionError:
@@ -284,8 +286,8 @@ class Sim:
         self.confirm(self.rng.choice(self.pending()), True)
 
     def declinable(self):
-        # A refused changed-proposal approval caches its resume value in the checkpoint, so such an action
-        # can never be declined afterwards (safe direction, reported in the fuzz notes, not exercised here).
+        # Changed-proposal actions are skipped here: declining them is covered by
+        # tests/test_review_fixes.py::test_a_changed_action_can_still_be_declined.
         return [a for a in self.pending() if self.status(a) == "proposed" and not self.acts[a]["changed"]]
 
     def ev_decline(self):

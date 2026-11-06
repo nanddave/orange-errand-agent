@@ -96,3 +96,23 @@ Offline scenarios use a scripted model, so these only appeared with Claude in th
 
 - **Approval buttons and message box clipped at a normal laptop window height.** At about 600 px of window height the approval card pushed past the bottom of the chat panel, so "Yes, book it" was cut off and the input was hidden. Cause: the message list had a 300 px minimum height inside a fixed-height, overflow-hidden panel. Fix: the list now has a 140 px minimum and the app a 640 px minimum height, so the card and input always fit and the list scrolls. Regression: `tests/test_web.py::test_chat_body_leaves_room_for_the_approval_card_and_input` (a layout check by string; the visual result was confirmed in the browser).
 - **"Last run: waiting" after a pick or approve.** The run summary read the newest run, which had no model call, so it showed "waiting" even after a real run. Fix: it now uses the latest run that had a model call. This is page JavaScript that pytest cannot execute, so it was verified in the browser, not by a unit test.
+
+## 22. After a booking, "is it confirmed?" showed the old options list
+
+- **Observed:** found by the owner clicking through the live demo. After a confirmed booking, asking whether it was confirmed returned "Options: … No booking has been made." again, including the time just booked. The trace showed one model turn and no tool call.
+- **Cause:** when the model answered in plain text, the agent replaced its answer with the options list whenever `state["candidates"]` was non-empty, and nothing cleared the candidates after a booking. The canned text also said "No booking has been made", which was false. Offline scenarios never asked a follow-up after completion, and the scripted model cannot ask one.
+- **Fix:** a confirmed, cancelled or rescheduled action clears the search state. A text-only reply with no tool call is then answered from the provider's booking list ("Your bookings: …"), never from model prose.
+- **Regression:** `tests/test_post_booking.py::test_status_question_after_booking_reports_the_booking_not_old_options`, `::test_finished_booking_clears_search_state_so_options_are_not_reshown`, and the eval row `post_booking_status_question`.
+
+## 23. Concurrent confirms reached the provider twice
+
+- **Observed:** found by an adversarial script, not in the demo. Twelve threads calling `confirm` on one approved action made two `book` calls (one booking, because the mock deduplicates by key). The web server's request lock hid this, but the agent API did not guarantee it.
+- **Cause:** `ActionDispatcher.execute` read the status and wrote `pending` without excluding another caller in the same process.
+- **Fix:** `execute` takes a per-dispatcher lock. Across processes the stored idempotency key still protects the provider.
+- **Regression:** `tests/test_post_booking.py::test_concurrent_confirms_reach_the_provider_once`.
+
+## 24. Web server: bad Content-Length, stalled body, non-string text
+
+- **Observed:** a non-numeric `Content-Length` raised an uncaught `ValueError` (traceback, dropped connection). A client that sent headers and then stalled held the request lock, so every other request got 409. `{"text": {...}}` was accepted and turned into a string.
+- **Fix:** controlled 400 for a bad length, the body is read before the lock is taken with a 10 s socket timeout, and `text` must be a string. The fuzz report's "UX" row also counted 0 checks; it now counts every agent call it makes.
+- **Regression:** `tests/test_post_booking.py::test_non_numeric_content_length_is_a_400`, `::test_stalled_body_does_not_hold_the_request_lock`, `::test_chat_text_must_be_a_string`.

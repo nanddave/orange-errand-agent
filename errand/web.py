@@ -17,70 +17,67 @@ from errand.model import AnthropicModel, RecordingModel, ReplayModel, ScriptedMo
 
 PAGE = r"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Orange Errand Agent</title><style>
-:root{--bg:#fbf7f2;--surface:#fff;--ink:#1f2933;--muted:#52606d;--line:#e4ddd3;--accent:#c2410c;--accent-strong:#9a3412;--accent-tint:#fff0e6;--accent-fill:#ffe3d1;--ok:#1a6b3c;--ok-tint:#e6f4ea;--warn:#8a4b00;--warn-tint:#fff3d6;--bad:#9b1c1c;--bad-tint:#fde8e8;--info-tint:#e8eef5;--shadow:0 1px 3px rgba(31,41,51,.08),0 4px 12px rgba(31,41,51,.05)}
+:root{--bg:#f6f6f4;--surface:#fff;--ink:#17191c;--muted:#5f6670;--line:#e1e1dc;--accent:#b4410a;--accent-strong:#8f3306;--accent-tint:#fbf4ef;--accent-fill:#f0e3d9;--ok:#1c6b3d;--ok-tint:#eef6f0;--warn:#8a4b00;--warn-tint:#fbf3df;--bad:#9b1c1c;--bad-tint:#fbeeee;--info-tint:#eceef1;--you:#eceef1}
 *{box-sizing:border-box}
-body{font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
-.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
-header{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 0}
+body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 0}
 .top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:12px}
-.mark{width:28px;height:28px;border-radius:50%;background:var(--accent);box-shadow:inset 0 0 0 6px var(--accent-fill),inset 0 0 0 9px var(--accent);flex:none}
-h1{font-size:20px;font-weight:600;line-height:1.25;margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.pill{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-strong);background:var(--accent-tint);border:1px solid var(--accent-fill);border-radius:999px;padding:1px 8px}
+h1{font-size:17px;font-weight:650;line-height:1.3;margin:0}
 .tagline{margin:0;font-size:13px;color:var(--muted)}
-.how{background:var(--accent-tint);border-bottom:1px solid var(--accent-fill);padding:8px 0;font-size:13px;color:var(--ink)}
-main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;max-width:1200px;margin:0 auto;height:calc(100vh - 170px);min-height:640px}
-section{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;min-height:0}
-h2{font-size:15px;font-weight:600;margin:0;padding:12px 16px;border-bottom:1px solid var(--line)}
+.demo{margin-left:6px;padding-left:8px;border-left:1px solid var(--line)}
+.how{background:var(--surface);border-bottom:1px solid var(--line);padding:6px 0;font-size:12.5px;color:var(--muted)}
+main{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;padding:16px 20px;max-width:1200px;margin:0 auto;height:calc(100vh - 118px);min-height:640px}
+section{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;min-height:0}
+h2{font-size:13px;font-weight:650;letter-spacing:.02em;margin:0;padding:11px 16px;border-bottom:1px solid var(--line);color:var(--ink)}
 .body{padding:16px;overflow:auto;flex:1;min-height:140px;white-space:pre-wrap}
 [hidden]{display:none!important}
-.bubble{padding:10px 14px;border-radius:14px;margin:0 0 10px;max-width:85%;width:fit-content;overflow-wrap:anywhere}
-.you{background:var(--accent-fill);margin-left:auto;border-bottom-right-radius:4px}
-.agent{background:#f1f3f5;border-bottom-left-radius:4px}
-form,.actions{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.bubble{padding:0;margin:0 0 14px;max-width:92%;overflow-wrap:anywhere}
+.you{background:var(--you);margin-left:auto;padding:8px 12px;border-radius:8px;width:fit-content}
+.agent{color:var(--ink)}
+form,.actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
 .actions{flex-wrap:wrap}
-#actions.approval-card{flex-direction:column;border:2px solid var(--accent);margin:12px;border-radius:12px;background:var(--accent-tint);max-height:45%;overflow:auto;flex:none}
-.approval-card h3,.confirm-card h3{margin:0 0 8px;font-size:16px;font-weight:600}
+#actions.approval-card{flex-direction:column;border:1px solid var(--line);border-top:3px solid var(--accent);margin:12px 16px;border-radius:8px;background:var(--surface);max-height:45%;overflow:auto;flex:none}
+.approval-card h3,.confirm-card h3{margin:0 0 8px;font-size:15px;font-weight:650}
 .rrow{display:flex;gap:8px;align-items:baseline}
 .rrow .lbl{width:70px;color:var(--muted);font-size:13px;flex:none}
 .rrow .val{font-weight:600}
-.approval-card .rrow:nth-of-type(n+2) .val{font-size:20px}
 .note{margin:8px 0 0;color:var(--muted);font-size:13px}
-.bar{display:flex;gap:8px;flex-wrap:wrap}
-.confirm-card{white-space:normal;border:2px solid var(--ok);border-radius:12px;background:var(--ok-tint);padding:12px 14px;margin:0 0 10px;max-width:90%}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.confirm-card{white-space:normal;border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:8px;background:var(--ok-tint);padding:12px 14px;margin:0 0 14px;max-width:92%}
 .confirm-card h3{color:var(--ok)}
-.confirm-card .hl{background:var(--warn-tint);color:var(--ink);padding:6px 8px;border-radius:6px;margin:8px 0 0;font-size:13px}
-#bookings{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);max-height:96px;overflow:auto}
-#bookings .chipb{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:2px 10px;font-size:13px}
+.confirm-card .hl{background:var(--warn-tint);color:var(--ink);padding:6px 8px;border-radius:4px;margin:8px 0 0;font-size:13px}
+#bookings{display:flex;gap:8px;flex-wrap:wrap;padding:8px 16px;border-top:1px solid var(--line);max-height:96px;overflow:auto}
+#bookings .chipb{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:2px 10px;font-size:13px}
 #bookings .chipb.dashed{border-style:dashed}
-.st-confirmed{color:var(--ok);font-weight:700}.st-cancelled{color:var(--bad);font-weight:700}.st-rescheduled{color:#175cd3;font-weight:700}
+.st-confirmed{color:var(--ok);font-weight:650}.st-cancelled{color:var(--bad);font-weight:650}.st-rescheduled{color:#175cd3;font-weight:650}
 .empty{color:var(--muted);font-size:13px}
-input[type=text]{flex:1;min-height:40px;padding:8px 12px;font:inherit;border:1px solid #9aa5b1;border-radius:8px;background:#fff;color:var(--ink)}
-button{min-height:40px;padding:8px 16px;font:inherit;font-weight:600;background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:8px;cursor:pointer;transition:background-color .12s,border-color .12s,box-shadow .12s}
+input[type=text]{flex:1;min-height:40px;padding:8px 12px;font:inherit;border:1px solid #b9bec5;border-radius:6px;background:#fff;color:var(--ink)}
+button{min-height:38px;padding:7px 16px;font:inherit;font-weight:600;background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:6px;cursor:pointer;transition:background-color .12s,border-color .12s}
 button:hover:not(:disabled){background:var(--accent-strong);border-color:var(--accent-strong)}
-button.secondary{background:#fff;color:var(--ink);border-color:#9aa5b1}
-button.secondary:hover:not(:disabled){background:#f1f3f5;border-color:var(--ink)}
+button.secondary{background:#fff;color:var(--ink);border-color:#b9bec5;font-weight:500}
+button.secondary:hover:not(:disabled){background:var(--bg);border-color:var(--ink)}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
 button:disabled{opacity:.5;cursor:default}
-.choices{white-space:normal;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:8px}
-.choices>button.secondary{background:#fff;color:var(--accent-strong);border:1.5px solid var(--accent);border-radius:999px;font-weight:500;margin:0}
-.choices>button.secondary:hover:not(:disabled){background:var(--accent-tint);border-color:var(--accent-strong)}
-.choices .card{flex:1 1 100%;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px}
-.choices .card b{font-size:16px;font-weight:700}
-.choices .card div{font-size:14px;color:var(--muted);margin:0 0 4px}
-.choices .card button{margin:4px 6px 0 0;background:#fff;color:var(--accent-strong);border:1.5px solid var(--accent);border-radius:999px;font-weight:500}
-.choices .card button:hover:not(:disabled){background:var(--accent);color:#fff}
-pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;padding:8px;background:#f1f3f5;border-radius:6px}
-.ev{white-space:normal;margin:0 0 8px;font-size:14px;word-break:break-word}
+.choices{white-space:normal;margin:0 0 14px;display:flex;flex-wrap:wrap;gap:8px}
+.choices>button.secondary{margin:0;text-align:left;min-height:34px;padding:5px 12px;font-size:14px}
+.choices .card{flex:1 1 100%;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.choices .card b{font-size:15px;font-weight:650}
+.choices .card div{font-size:13px;color:var(--muted);margin:0 0 6px}
+.choices .card button{margin:4px 6px 0 0;min-height:34px;padding:4px 12px;background:#fff;color:var(--ink);border:1px solid #b9bec5;font-weight:500;font-size:14px}
+.choices .card button:hover:not(:disabled){background:var(--accent);border-color:var(--accent);color:#fff}
+pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;padding:8px;background:var(--bg);border-radius:4px}
+.ev{white-space:normal;margin:0 0 8px;font-size:13.5px;word-break:break-word}
 .ev summary{cursor:pointer}
-.tag{display:inline-block;font-weight:700;font-size:11px;line-height:1.5;letter-spacing:.06em;text-transform:uppercase;margin-right:8px;padding:0 8px;border-radius:999px;background:var(--info-tint);color:#3d4b5c}
+.tag{display:inline-block;font-weight:650;font-size:10.5px;line-height:1.6;letter-spacing:.06em;text-transform:uppercase;margin-right:8px;padding:0 6px;border-radius:4px;background:var(--info-tint);color:#3d4652}
 .ev.red .tag{background:var(--bad-tint);color:var(--bad)}.ev.green .tag{background:var(--ok-tint);color:var(--ok)}.ev.amber .tag{background:var(--warn-tint);color:var(--warn)}
-.legend{font-size:13px;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line)}
-.cap{font-size:13px;color:var(--muted);margin:4px 0 0;max-width:420px}
+.legend{font-size:12px;color:var(--muted);padding:7px 16px;border-bottom:1px solid var(--line)}
+.cap{font-size:12px;color:var(--muted);margin:4px 0 0;max-width:420px}
 #simbox{text-align:right}
+#simbox button{min-height:34px;font-size:13px}
 @media(max-width:800px){main{grid-template-columns:1fr;height:auto}section{min-height:420px}#simbox{text-align:left}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style><header><div class="wrap top"><div class="brand"><span class="mark" aria-hidden="true"></span><div><h1>Orange Errand Agent <span class="pill">Demo</span></h1><p class="tagline">Book home services. You approve every step.</p></div></div><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div></div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
+</style><header><div class="wrap top"><div><h1>Orange Errand Agent</h1><p class="tagline">Book home services. You approve every step.<span class="demo">Local demo, mock providers</span></p></div><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div></div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
 <script>
 let pending=null;const chat=document.getElementById('chat'),trace=document.getElementById('trace'),actions=document.getElementById('actions'),tech=document.getElementById('tech');
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -193,6 +190,8 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
         return {"provider": friendly(booking["provider"]), "slot_label": _slot_label(booking["slot"])}
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = 10
+
         def send(self, code, data, content_type="application/json"):
             body = data.encode() if isinstance(data, str) else json.dumps(data).encode()
             self.send_response(code)
@@ -244,21 +243,30 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                 return self.send(403, {"error": "local origin required"})
             if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
                 return self.send(415, {"error": "JSON required"})
-            size = int(self.headers.get("Content-Length", "0"))
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                return self.send(400, {"error": "invalid Content-Length"})
             if size < 1 or size > 24000:
                 return self.send(413, {"error": "request too large"})
             if self.path not in {"/chat", "/select", "/approve", "/simulate-provider-cancel"}:
                 return self.send(404, {"error": "not found"})
+            try:
+                raw = self.rfile.read(size)  # read before taking the lock: a stalled client must not block others
+            except OSError:
+                return self.send(408, {"error": "request body timed out"})
             if not busy.acquire(blocking=False):
                 return self.send(409, {"error": "Still working on your last request. Please wait."})
             try:
-                data = json.loads(self.rfile.read(size))
+                data = json.loads(raw)
                 if self.path == "/chat":
                     if pending["action_id"] and dispatcher.status(pending["action_id"]) in {"proposed", "pending"}:
                         result = {"status": "approval_required", "action_id": pending["action_id"],
                                   "message": "Resolve the pending action before starting a new request."}
                     else:
-                        result = agent.handle("demo", str(data["text"]))
+                        if type(data["text"]) is not str:
+                            return self.send(400, {"error": "text must be a string"})
+                        result = agent.handle("demo", data["text"])
                         pending["action_id"] = result.get("action_id")
                 elif self.path == "/select":
                     if type(data.get("provider_id")) is not str or type(data.get("slot")) is not str:

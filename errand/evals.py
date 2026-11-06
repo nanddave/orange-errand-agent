@@ -304,7 +304,7 @@ def run_extra(name, root):
         assert any(e["event"] == "review_flagged" and e["provider_id"] == "plumber-1" for e in trace_events(root))
         return result["status"]
     if name in {"options_list_slots", "search_does_not_block_update", "model_sees_current_options",
-                "select_click_proposes_booking", "select_unoffered_slot_blocked", "all_missing_at_once"}:
+                "select_click_proposes_booking", "select_unoffered_slot_blocked", "all_missing_at_once", "post_booking_status_question"}:
         return run_flow(name, root)
     if name == "recorded_claude_session":
         agent, provider = setup(root, [], scenario="timeout_success")
@@ -333,6 +333,15 @@ def run_flow(name, root):
         result = agent.handle("nand", "Find me a plumber")
         assert result["status"] == "needs_input" and result["missing"] == ["service", "area", "date_range", "budget"]
         assert all(word in result["message"] for word in ("service", "area", "date range", "budget"))
+        return result["status"]
+    if name == "post_booking_status_question":
+        agent, provider = setup(root, booking_steps())
+        confirmed = agent.confirm(agent.handle("nand", "Plumber in Indiranagar November 6 under 1500")["action_id"], True)
+        assert confirmed["status"] == "confirmed"
+        agent.model = ScriptedModel([{"type": "text", "text": "Options: stale"}])
+        result = agent.handle("nand", "Is my booking confirmed?")
+        assert "Your bookings:" in result["message"] and "(confirmed)" in result["message"] and "options" not in result
+        assert "No booking has been made" not in result["message"] and provider.booking_count() == 1
         return result["status"]
     if name == "search_does_not_block_update":
         agent, provider = setup(root, [call("update_request", **FACTS), call("search_providers"),
@@ -421,6 +430,7 @@ CASES = [
     ("model_sees_current_options", "approval_required", "Second turn prompt contains plumber-1 and exact slot; hold+book proposes; 0 book calls"),
     ("select_click_proposes_booking", "approval_required", "select() with no model proposes; 0 book calls until confirm, then exactly 1"),
     ("select_unoffered_slot_blocked", "blocked", "select() of a 10:00 slot never offered: 0 holds taken, 0 book calls"),
+    ("post_booking_status_question", "ready", "After a booking, 'is it confirmed?' is answered from provider data, not the old options list; 1 booking"),
     ("recorded_claude_session", "confirmed", "Real Claude conversation replayed offline from cassettes/session.json: injection flagged, timeout after success, status check, 1 booking, 1 book call"),
 ]
 

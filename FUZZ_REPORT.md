@@ -38,7 +38,7 @@ Each run: seeded random conversation, injected faults, real ChatAgent + ActionDi
 | I7: A redelivered provider-cancel event leaves at most one live replacement action | 757 | 0 |
 | I8: Forgotten memories never reach build_context, inspect or the model context | 733 | 0 |
 | I9: Provider review text cannot change the request or memory | 234 | 0 |
-| UX: No unexpected exception type or swallowed internal error | 0 | 0 |
+| UX: No unexpected exception type or swallowed internal error | 3926 | 0 |
 
 ## First violations
 

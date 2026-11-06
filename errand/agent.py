@@ -300,6 +300,10 @@ class ChatAgent:
                 elif state.get("searched"):
                     return self._result(user_id, facts, history, state, "no_match", "I found no providers within your budget and time window. No booking has been made.")
                 else:
+                    # A direct question with no tool call ("is my booking confirmed?") is answered from provider data.
+                    summary = self._bookings_summary(user_id) if tool_calls == 0 else ""
+                    if summary:
+                        return self._result(user_id, facts, history, state, "ready", summary)
                     message = "I have the request details. I can search providers when you're ready. No booking has been made."
                 return self._result(user_id, facts, history, state, "ready", message)
             tool_calls += 1
@@ -343,6 +347,8 @@ class ChatAgent:
                     return self._result(user_id, facts, history, state, "blocked", "Provider content cannot change your request. No booking was made.")
                 if "budget" in args and (type(args["budget"]) is not int or args["budget"] <= 0):
                     return self._result(user_id, facts, history, state, "blocked", "The budget must be a positive number. No booking was made.")
+                if "budget" in args and args["budget"] > 100000:
+                    return self._result(user_id, facts, history, state, "blocked", "That budget is too large to be a home-service budget (limit ₹100,000). No booking was made.")
                 if "date_range" in args:
                     try:
                         date.fromisoformat(args["date_range"])
@@ -438,6 +444,8 @@ class ChatAgent:
                 {"configurable": {"thread_id": action_id}}, durability="sync",
             )
         outcome = result.get("outcome", "unknown")
+        if outcome in {"confirmed", "cancelled", "rescheduled"}:
+            self._clear_search(proposal["user_id"])
         if proposal.get("action", "book") == "book":
             if outcome == "confirmed":
                 self._infer_area(proposal["user_id"])
@@ -445,6 +453,19 @@ class ChatAgent:
             elif outcome == "hold_expired":
                 return self._repropose(action_id, proposal)
         return {"status": outcome, "message": "Booking confirmed." if outcome == "confirmed" else outcome.replace("_", " ").capitalize() + "."}
+
+    def _clear_search(self, user_id):
+        # A finished action ends its search; stale options would be re-shown as if nothing had been booked.
+        facts, history, state = self._load(user_id)
+        if any([state.pop(key, None) is not None for key in ("candidates", "searched")]):
+            self._save(user_id, facts, history, state)
+
+    def _bookings_summary(self, user_id):
+        items = self.tools.list_bookings(user_id)
+        if not items:
+            return ""
+        parts = [f"{b['provider'].replace('-', ' ').title()}, {_slot_label(b['slot'])} ({b['status']})" for b in items[-3:]]
+        return "Your bookings: " + "; ".join(parts) + "."
 
     def _consume_hold(self, user_id, hold_id):
         # A booked hold is spent: the model cannot propose booking it a second time.
