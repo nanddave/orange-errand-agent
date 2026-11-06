@@ -117,3 +117,10 @@ Offline scenarios use a scripted model, so these only appeared with Claude in th
 - **Observed:** a non-numeric `Content-Length` raised an uncaught `ValueError` (traceback, dropped connection). A client that sent headers and then stalled held the request lock, so every other request got 409. `{"text": {...}}` was accepted and turned into a string.
 - **Fix:** controlled 400 for a bad length, the body is read before the lock is taken with a 10 s socket timeout, and `text` must be a string. The fuzz report's "UX" row also counted 0 checks; it now counts every agent call it makes.
 - **Regression:** `tests/test_post_booking.py::test_non_numeric_content_length_is_a_400`, `::test_stalled_body_does_not_hold_the_request_lock`, `::test_chat_text_must_be_a_string`.
+
+## 25. Real model treated "Move my AC servicing to Saturday" as a new search; reschedule accepted any time text
+
+- **Observed:** recording the brief's second example with the live model. The model called `update_request` and the agent asked for area and budget, so the booking was never looked up. Separately, `reschedule` accepted any text as the new slot (the old eval even passed the word "busy").
+- **Cause:** the prompt told the model to use `list_bookings` for "my booking", but not that moving or cancelling something it already has is a different path from a new request. `update_request` with missing facts ends the run early. The reschedule slot was never validated.
+- **Fix:** the prompt says to call `list_bookings` first and then `reschedule` or `cancel`, and to turn a weekday into a `YYYY-MM-DD` date. A reschedule time must now contain a date and `HH:MM`; anything else is blocked before any proposal, and it is normalised to the provider's zone.
+- **Regression:** eval `recorded_reschedule_ac` (the real conversation replayed offline) and `tests/test_post_booking.py::test_reschedule_with_an_unparseable_time_is_blocked_before_any_proposal`. A first live attempt after the fix hit the 30-second run limit on a slow API call and was reported as limit_reached with nothing booked; the next attempt completed.

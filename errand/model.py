@@ -79,6 +79,17 @@ def _latest_hold_id(messages):
         return None
 
 
+def _latest_booking_id(messages):
+    """First booking id in the latest list_bookings result, for replaying a recorded reschedule or cancel."""
+    content = messages[-1]["content"] if messages else ""
+    if isinstance(content, list):
+        content = next((b.get("content") for b in content if b.get("type") == "tool_result"), "")
+    try:
+        return json.loads(content)[0]["id"]
+    except (TypeError, ValueError, KeyError, IndexError):
+        return None
+
+
 class ReplayModel:
     """Plays a recorded cassette back offline; `book` gets the current run's hold id."""
     live = False
@@ -97,4 +108,10 @@ class ReplayModel:
             for block in step.get("assistant_content") or []:
                 if block.get("type") == "tool_use" and block.get("name") == "book":
                     block["input"]["hold_id"] = hold_id
+        booking_id = _latest_booking_id(messages) if step.get("name") in {"reschedule", "cancel"} else None
+        if booking_id:
+            step["input"]["booking_id"] = booking_id
+            for block in step.get("assistant_content") or []:
+                if block.get("type") == "tool_use" and block.get("name") == step["name"]:
+                    block["input"]["booking_id"] = booking_id
         return step

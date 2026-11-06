@@ -2,6 +2,13 @@
 
 Local, single-agent home-service booking demo for the Orange engineering assignment. It uses eight in-process mock provider tools and code-enforced approval. No real provider or payment integration exists.
 
+## Reviewer path (about 60 seconds)
+
+1. `./proof.sh` runs the tests, all offline evals and 500 seeded fault-injection runs, and prints one summary line each.
+2. Read [DESIGN_NOTE.md](DESIGN_NOTE.md) (one page) and the raw real-model run in [TIMEOUT_TRACE_LIVE.txt](TIMEOUT_TRACE_LIVE.txt).
+3. Evidence index: [EVAL_TABLE.md](EVAL_TABLE.md) (generated), [FUZZ_REPORT.md](FUZZ_REPORT.md) (generated), [BUGS.md](BUGS.md) (reproduced bugs with regression tests), [cassettes/](cassettes/) (real Claude conversations replayed offline: a booking with a timeout, "Move my AC servicing to Saturday", "same electrician as last time, not before 10 a.m.").
+4. Limits: the fuzz exercises the mock provider's failure modes with scripted model actions, not production traffic; real-model variability is covered by the recorded cassettes and `BUGS.md` entries 9 and 16–18, not at scale.
+
 ## Run locally
 
 Requires Python 3.11–3.13. From this directory:
@@ -13,7 +20,7 @@ python3.11 -m venv .venv
 .venv/bin/python -m errand.evals
 ```
 
-`pytest` runs the unit tests and all 51 offline simulated-user scenarios, and fails if the committed `EVAL_TABLE.md` is stale. `python -m errand.evals` regenerates that table. Tests and evals need no API key.
+`pytest` runs the unit tests and all 53 offline simulated-user scenarios, and fails if the committed `EVAL_TABLE.md` is stale. `python -m errand.evals` regenerates that table. Tests and evals need no API key.
 
 ## Live demo (chat left, trace right)
 
@@ -27,7 +34,7 @@ Open `http://127.0.0.1:8765` (loopback only; `--port` changes it, `--scripted` r
 
 1. Ask: "Find a plumber for my kitchen tap on 6 November in Indiranagar, mornings only, under ₹1,500."
 2. Ask: "Read the reviews for plumber-1, then hold its 9am slot and book it." The trace shows the injected review flagged, and the app asks you to approve the exact action.
-3. Click **Approve exact action**. The `timeout_success` scenario loses the booking acknowledgement after the provider booked; the trace shows `booking_timeout`, then `status_checked: confirmed`, then `confirmed`. One provider booking exists.
+3. Click **Yes, book it**. The `timeout_success` scenario loses the booking acknowledgement after the provider booked; the trace shows `booking_timeout`, then `status_checked: confirmed`, then `confirmed`. One provider booking exists.
 4. Click **Simulate provider cancellation**. The agent notices without a user message, finds a replacement within your known preferences, and asks for fresh approval. It never books a replacement on its own.
 
 Each trace line expands to its raw JSON. Review text is untrusted and is rendered as plain text.
@@ -36,7 +43,7 @@ Each trace line expands to its raw JSON. Review text is untrusted and is rendere
 
 - [Design note](DESIGN_NOTE.md): state, approval, idempotency, memory and trace excerpt.
 - [Orange note](ORANGE_NOTE.md): how the same gate would carry over to a WhatsApp money assistant, and what it does not cover.
-- [Generated eval table](EVAL_TABLE.md): 51 executed offline scenarios, each with the invariant it asserts.
+- [Generated eval table](EVAL_TABLE.md): 53 executed offline scenarios, each with the invariant it asserts.
 - [Real bugs](BUGS.md): observed failures, causes, fixes and regression tests.
 - [Live trace](TIMEOUT_TRACE_LIVE.txt): raw trace of a real-model run (Claude Sonnet 5.5) through timeout-after-success to verified booking.
 - [Scripted trace](TIMEOUT_TRACE.txt): the same flow with the scripted model, kept as a deterministic reference.

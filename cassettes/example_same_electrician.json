@@ -1,0 +1,188 @@
+[
+  {
+    "type": "tool",
+    "name": "list_bookings",
+    "input": {
+      "user_id": "me"
+    },
+    "tool_use_id": "toolu_018gQzu78oV6L2FuoAUfksmD",
+    "assistant_content": [
+      {
+        "signature": "CAQSrQYKEAgTGAI4AUIIdGhpbmtpbmcSDNIOG+7eudeN9EXfhBoMG83ZNJrIGtzPBdsFIjAtW/7/y6qiBYJjbcQhqasfamzg7B4hXZcM0VNIDlYpwZbBHDlcbTXmHC0KDlf/xNMqygVppV25JtNS3+IxRnbuUJXnEBIRzyQqJWqCimo/A2OU3hEk9Jb+hg5cnv7HpBJWC1uiUDcfggs/yla9ccOBuqKQUE2h6jTH2ePbfmHQAr4obYAF1zVUlA9dAL72BjIYL1Qle0uXjnl9KWNEg785Licq8QdXjTGxIwbxB3ZuBmwPE9lcmw6vsSW4oDtcBq+CgNHrkarpNLaOME9Fbcm2ZDFAxsFN9t6g0evnQ78wudWniY6vu/23WUE7pnvvJ/kp27qTwc6cgyysZD3OSbJkTqHSyTbbc5X8uK8o48djDnDWSHiRav2/O0gOlpoxNycpWEe6cn5o/xhol1dD0/hFz33XTGNp2+v5dWMzpDdL508uyWqwuAnqCOtbn9Od3tkyJbr/ZN8ZCc6AiCBi/HDJmZfUG3HOM2TF0JCbkrz/75l6j2/FLO9L+YVQW4PMR9m3V5pthDx5n7ufe28sJPd99/1/BmboEGdUgIs/eKEPDFF58gacqqqt0yBa+EDBIky3SNd15gbzAmJO8dQkQ0FPFUUiAtg7ZvMI0DixnSQZbQ2NvbuKQ61PHfp7iBJIzjOCNcYKnJHHlzPp/W1lMuQpp0G7AtJ2A0Vy6lfS4fOymgnmc65J945KwLqiJ0W8Y1BmVGPyvuwZfpbQy/hGfknS+9M8dCULOnV82szXJsswbJfkRZ87XFWFls6Fv9Q+Amjupa8SQrtZn51ZqqOpCnLGP6v85cXOqq0wI1N/keQLtdXlnN10wiUg+QH7AzS9iVrnIW8+gTYn7qRyW9AZ71WVuyUXdO1/pf30jxLykHrVOle9J0+hF7LwAtEW4mrf8MXAa8i5V+Pb43sAPKUcP5mXBfATK2TfMKJFGj1QXYZEHFv7ONyAcVU6ZexY5hqebiLynJwFlm/yjzOz0ZJWe4vKpnrWi+zBI7RXfQfYUcAVQWwhnkATauiw0TkWnb8YAQ==",
+        "thinking": "",
+        "type": "thinking"
+      },
+      {
+        "id": "toolu_018gQzu78oV6L2FuoAUfksmD",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "user_id": "me"
+        },
+        "name": "list_bookings",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2007,
+      "output_tokens": 124
+    }
+  },
+  {
+    "type": "tool",
+    "name": "update_request",
+    "input": {
+      "service": "electrician",
+      "earliest_time": "10:00",
+      "preferences": "same provider as last time: electrician-1"
+    },
+    "tool_use_id": "toolu_01YJCu1ynHBAHbk6jzBy6EBr",
+    "assistant_content": [
+      {
+        "id": "toolu_01YJCu1ynHBAHbk6jzBy6EBr",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "service": "electrician",
+          "earliest_time": "10:00",
+          "preferences": "same provider as last time: electrician-1"
+        },
+        "name": "update_request",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2228,
+      "output_tokens": 108
+    }
+  },
+  {
+    "type": "tool",
+    "name": "update_request",
+    "input": {
+      "area": "Koramangala",
+      "date_range": "2026-11-07",
+      "budget": 2000,
+      "service": "electrician",
+      "earliest_time": "10:00"
+    },
+    "tool_use_id": "toolu_01DG6mFqioMgFjXcYkuwkp8P",
+    "assistant_content": [
+      {
+        "id": "toolu_01DG6mFqioMgFjXcYkuwkp8P",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "area": "Koramangala",
+          "date_range": "2026-11-07",
+          "budget": 2000,
+          "service": "electrician",
+          "earliest_time": "10:00"
+        },
+        "name": "update_request",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2045,
+      "output_tokens": 150
+    }
+  },
+  {
+    "type": "tool",
+    "name": "search_providers",
+    "input": {
+      "service": "electrician",
+      "area": "Koramangala",
+      "date_range": "2026-11-07"
+    },
+    "tool_use_id": "toolu_01XvgfMZBgJCCXBozWP63C3V",
+    "assistant_content": [
+      {
+        "id": "toolu_01XvgfMZBgJCCXBozWP63C3V",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "service": "electrician",
+          "area": "Koramangala",
+          "date_range": "2026-11-07"
+        },
+        "name": "search_providers",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2281,
+      "output_tokens": 101
+    }
+  },
+  {
+    "type": "tool",
+    "name": "hold_slot",
+    "input": {
+      "provider_id": "electrician-1",
+      "slot": "2026-11-07T11:00:00+05:30"
+    },
+    "tool_use_id": "toolu_01Y1kryWatPNm2VAGmvUYRFC",
+    "assistant_content": [
+      {
+        "citations": null,
+        "text": "Electrician 1, your provider from last time, has a slot on 7 November at 11:00 AM. I'll hold it.",
+        "type": "text"
+      },
+      {
+        "id": "toolu_01Y1kryWatPNm2VAGmvUYRFC",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "provider_id": "electrician-1",
+          "slot": "2026-11-07T11:00:00+05:30"
+        },
+        "name": "hold_slot",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2654,
+      "output_tokens": 131
+    }
+  },
+  {
+    "type": "tool",
+    "name": "book",
+    "input": {
+      "hold_id": "82277493-ece3-4c81-b279-a6327a7ac25d",
+      "idempotency_key": "book-electrician-1-20261107-1100"
+    },
+    "tool_use_id": "toolu_01NwJDAtsk1vgbipz7nF2jaX",
+    "assistant_content": [
+      {
+        "id": "toolu_01NwJDAtsk1vgbipz7nF2jaX",
+        "caller": {
+          "type": "direct"
+        },
+        "input": {
+          "hold_id": "82277493-ece3-4c81-b279-a6327a7ac25d",
+          "idempotency_key": "book-electrician-1-20261107-1100"
+        },
+        "name": "book",
+        "type": "tool_use",
+        "toolset_name": null
+      }
+    ],
+    "usage": {
+      "input_tokens": 2847,
+      "output_tokens": 108
+    }
+  }
+]

@@ -154,8 +154,9 @@ def run(name, root):
             result = agent.confirm(proposal["action_id"], True)
             assert provider.list_bookings("nand")[0]["status"] == "cancelled"
         else:
-            provider.conflict_slots.add("busy")
-            agent.model = ScriptedModel([call("reschedule", booking_id=booking["id"], slot="busy")])
+            busy = "2026-11-08T09:00:00+05:30"
+            provider.conflict_slots.add(busy)
+            agent.model = ScriptedModel([call("reschedule", booking_id=booking["id"], slot=busy)])
             proposal = agent.handle("nand", "Move my appointment")
             result = agent.confirm(proposal["action_id"], True)
             assert provider.list_bookings("nand")[0]["slot"] == SLOT
@@ -304,7 +305,8 @@ def run_extra(name, root):
         assert any(e["event"] == "review_flagged" and e["provider_id"] == "plumber-1" for e in trace_events(root))
         return result["status"]
     if name in {"options_list_slots", "search_does_not_block_update", "model_sees_current_options",
-                "select_click_proposes_booking", "select_unoffered_slot_blocked", "all_missing_at_once", "post_booking_status_question"}:
+                "select_click_proposes_booking", "select_unoffered_slot_blocked", "all_missing_at_once", "post_booking_status_question",
+                "recorded_reschedule_ac", "recorded_same_electrician"}:
         return run_flow(name, root)
     if name == "recorded_claude_session":
         agent, provider = setup(root, [], scenario="timeout_success")
@@ -334,6 +336,20 @@ def run_flow(name, root):
         assert result["status"] == "needs_input" and result["missing"] == ["service", "area", "date_range", "budget"]
         assert all(word in result["message"] for word in ("service", "area", "date range", "budget"))
         return result["status"]
+    if name in {"recorded_reschedule_ac", "recorded_same_electrician"}:
+        from errand import examples
+        key = name.removeprefix("recorded_")
+        cassette = Path(__file__).resolve().parent.parent / "cassettes" / f"example_{key}.json"
+        agent, provider, results = examples.run(root, key, ReplayModel(cassette))
+        bookings = provider.list_bookings("nand")
+        assert results[-2]["status"] == "approval_required" and results[-1]["status"] in {"rescheduled", "confirmed"}
+        if key == "reschedule_ac":
+            assert [(b["slot"], b["status"]) for b in bookings] == [("2026-11-07T09:00:00+05:30", "confirmed")]
+            assert provider.book_call_count() == 1  # only the fixture's own booking; the reschedule made no book call
+        else:
+            assert len(bookings) == 2 and {b["provider"] for b in bookings} == {"electrician-1"}
+            assert bookings[1]["slot"][11:16] >= "10:00" and provider.book_call_count() == 2
+        return results[-1]["status"]
     if name == "post_booking_status_question":
         agent, provider = setup(root, booking_steps())
         confirmed = agent.confirm(agent.handle("nand", "Plumber in Indiranagar November 6 under 1500")["action_id"], True)
@@ -431,6 +447,8 @@ CASES = [
     ("select_click_proposes_booking", "approval_required", "select() with no model proposes; 0 book calls until confirm, then exactly 1"),
     ("select_unoffered_slot_blocked", "blocked", "select() of a 10:00 slot never offered: 0 holds taken, 0 book calls"),
     ("post_booking_status_question", "ready", "After a booking, 'is it confirmed?' is answered from provider data, not the old options list; 1 booking"),
+    ("recorded_reschedule_ac", "rescheduled", "Real Claude: 'Move my AC servicing to Saturday' finds the booking, proposes 7 Nov 9:00 AM, exact approval, 1 booking, no new book call"),
+    ("recorded_same_electrician", "confirmed", "Real Claude: 'same electrician as last time, not before 10 a.m.' reuses electrician-1, books 11:00 AM (not 9:00) after approval; 2 bookings total"),
     ("recorded_claude_session", "confirmed", "Real Claude conversation replayed offline from cassettes/session.json: injection flagged, timeout after success, status check, 1 booking, 1 book call"),
 ]
 

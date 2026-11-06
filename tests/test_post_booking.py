@@ -111,3 +111,12 @@ def test_status_questions_never_reach_the_model_but_requests_still_do(tmp_path):
     agent.model = ScriptedModel([call("update_request", **FACTS), call("search_providers"), {"type": "text", "text": "x"}])
     assert agent.handle("nand", "Book another plumber")["status"] == "ready"
     assert agent.facts("nand")["service"] == "plumber"
+
+
+def test_reschedule_with_an_unparseable_time_is_blocked_before_any_proposal(tmp_path):
+    agent, provider, _ = booked(tmp_path)
+    booking = provider.list_bookings("nand")[0]
+    agent.model = ScriptedModel([call("reschedule", booking_id=booking["id"], slot="Saturday morning")])
+    result = agent.handle("nand", "Move my appointment")
+    assert result["status"] == "blocked" and "action_id" not in result
+    assert provider.list_bookings("nand")[0]["slot"] == booking["slot"]

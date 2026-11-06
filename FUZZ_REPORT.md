@@ -7,38 +7,38 @@ Each run: seeded random conversation, injected faults, real ChatAgent + ActionDi
 - Seed: 1
 - Total events: 3492
 - Total violations: 0
-- Handled faults (expected PermissionError/RuntimeError): 325
+- Handled faults (expected PermissionError/RuntimeError): 323
 
 ## Coverage
 
 | Fault | Times exercised | Runs reaching it |
 |---|---|---|
-| Lost ack after a successful booking, recovered by status check | 42 | 35 |
-| get_booking_status failed once (action left pending) | 124 | 124 |
-| Expired hold re-proposed for new approval | 52 | 44 |
-| Proposal changed after display, confirm refused | 89 | 81 |
-| Extra confirm calls on an already-decided action | 219 | 89 |
-| Provider, dispatcher and agent rebuilt on the same database | 296 | 222 |
-| Provider cancelled a confirmed booking, event delivered | 164 | 145 |
-| Provider-cancel event redelivered | 143 | 118 |
-| Review injection followed by update/memory call, blocked | 234 | 189 |
-| Cancel hit a transient 503 and was retried | 73 | 67 |
-| Reschedule hit a slot conflict | 23 | 22 |
+| Lost ack after a successful booking, recovered by status check | 43 | 36 |
+| get_booking_status failed once (action left pending) | 127 | 127 |
+| Expired hold re-proposed for new approval | 53 | 43 |
+| Proposal changed after display, confirm refused | 86 | 78 |
+| Extra confirm calls on an already-decided action | 195 | 79 |
+| Provider, dispatcher and agent rebuilt on the same database | 307 | 230 |
+| Provider cancelled a confirmed booking, event delivered | 162 | 143 |
+| Provider-cancel event redelivered | 147 | 117 |
+| Review injection followed by update/memory call, blocked | 235 | 189 |
+| Cancel hit a transient 503 and was retried | 80 | 73 |
+| Reschedule hit a slot conflict | 15 | 15 |
 
 ## Invariants
 
 | Invariant | Checks made | Violations |
 |---|---|---|
-| I1: Every provider booking has a ledger action with its key whose approval equals the proposal shown | 504 | 0 |
-| I2: At most one provider booking per idempotency key, per hold and per approved book action | 1008 | 0 |
-| I3: At most 2 book calls per key, the 2nd only after status said not_found, none after confirmed | 1509 | 0 |
-| I4: A confirmed action or result has a provider booking row for its key | 539 | 0 |
-| I5: Every executed action has approved == proposal == presented; unapproved execute is refused | 2051 | 0 |
-| I6: An action changed after display never executes (confirm raises, 0 book calls) | 331 | 0 |
-| I7: A redelivered provider-cancel event leaves at most one live replacement action | 757 | 0 |
-| I8: Forgotten memories never reach build_context, inspect or the model context | 733 | 0 |
-| I9: Provider review text cannot change the request or memory | 234 | 0 |
-| UX: No unexpected exception type or swallowed internal error | 3926 | 0 |
+| I1: Every provider booking has a ledger action with its key whose approval equals the proposal shown | 507 | 0 |
+| I2: At most one provider booking per idempotency key, per hold and per approved book action | 1014 | 0 |
+| I3: At most 2 book calls per key, the 2nd only after status said not_found, none after confirmed | 1552 | 0 |
+| I4: A confirmed action or result has a provider booking row for its key | 545 | 0 |
+| I5: Every executed action has approved == proposal == presented; unapproved execute is refused | 1934 | 0 |
+| I6: An action changed after display never executes (confirm raises, 0 book calls) | 323 | 0 |
+| I7: A redelivered provider-cancel event leaves at most one live replacement action | 765 | 0 |
+| I8: Forgotten memories never reach build_context, inspect or the model context | 737 | 0 |
+| I9: Provider review text cannot change the request or memory | 235 | 0 |
+| UX: No unexpected exception type or swallowed internal error | 3902 | 0 |
 
 ## First violations
 
