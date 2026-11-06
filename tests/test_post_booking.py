@@ -98,3 +98,16 @@ def test_stalled_body_does_not_hold_the_request_lock(tmp_path):
     finally:
         stalled.close()
         server.shutdown()
+
+
+def test_status_questions_never_reach_the_model_but_requests_still_do(tmp_path):
+    agent, provider, _ = booked(tmp_path)
+    searched = ScriptedModel([call("search_providers"), {"type": "text", "text": "x"}])
+    for phrase in ["give me my booking confirmation", "Is my booking confirmed?", "what is the status of my booking", "did it go through?"]:
+        agent.model = searched
+        result = agent.handle("nand", phrase)
+        assert result["message"].startswith("Your bookings:") and "options" not in result, phrase
+    assert len(list(searched.steps)) == 2  # the model was never asked
+    agent.model = ScriptedModel([call("update_request", **FACTS), call("search_providers"), {"type": "text", "text": "x"}])
+    assert agent.handle("nand", "Book another plumber")["status"] == "ready"
+    assert agent.facts("nand")["service"] == "plumber"

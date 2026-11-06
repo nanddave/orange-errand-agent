@@ -38,7 +38,7 @@ def test_missing_lists_all_and_agrees_across_paths(tmp_path):
                                 call("search_providers")])
     first = agent.handle("nand", "hi")
     assert first["missing"] == ["service", "area", "date_range", "budget"]
-    assert first["message"] == "I still need: service, area, date range, budget."
+    assert first["message"] == "hi I still need: service, area, date range, budget."  # model wording, then the code-owned list
     second = agent.handle("nand", "plumber")
     assert second["missing"] == ["area", "date_range", "budget"]
     third = agent.handle("nand", "search")

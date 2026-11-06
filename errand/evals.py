@@ -338,8 +338,8 @@ def run_flow(name, root):
         agent, provider = setup(root, booking_steps())
         confirmed = agent.confirm(agent.handle("nand", "Plumber in Indiranagar November 6 under 1500")["action_id"], True)
         assert confirmed["status"] == "confirmed"
-        agent.model = ScriptedModel([{"type": "text", "text": "Options: stale"}])
-        result = agent.handle("nand", "Is my booking confirmed?")
+        agent.model = ScriptedModel([call("search_providers"), {"type": "text", "text": "Options: stale"}])
+        result = agent.handle("nand", "give me my booking confirmation")
         assert "Your bookings:" in result["message"] and "(confirmed)" in result["message"] and "options" not in result
         assert "No booking has been made" not in result["message"] and provider.booking_count() == 1
         return result["status"]

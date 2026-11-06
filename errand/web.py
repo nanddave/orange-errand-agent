@@ -46,7 +46,7 @@ form,.actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .confirm-card{white-space:normal;border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:8px;background:var(--ok-tint);padding:12px 14px;margin:0 0 14px;max-width:92%}
 .confirm-card h3{color:var(--ok)}
-.confirm-card .hl{background:var(--warn-tint);color:var(--ink);padding:6px 8px;border-radius:4px;margin:8px 0 0;font-size:13px}
+.approval-card .hl,.confirm-card .hl{background:var(--warn-tint);color:var(--ink);padding:6px 8px;border-radius:4px;margin:8px 0 0;font-size:13px}
 #bookings{display:flex;gap:8px;flex-wrap:wrap;padding:8px 16px;border-top:1px solid var(--line);max-height:96px;overflow:auto}
 #bookings .chipb{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:2px 10px;font-size:13px}
 #bookings .chipb.dashed{border-style:dashed}
@@ -75,9 +75,22 @@ pre{font-size:12px;white-space:pre-wrap;word-break:break-word;margin:4px 0 0;pad
 .cap{font-size:12px;color:var(--muted);margin:4px 0 0;max-width:420px}
 #simbox{text-align:right}
 #simbox button{min-height:34px;font-size:13px}
+#intakebox{border-bottom:1px solid var(--line);padding:0 16px}
+#intakebox summary{cursor:pointer;font-weight:650;font-size:13px;padding:10px 0}
+#intake{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;padding:0 0 14px;border:0}
+#intake label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:500}
+#intake input,#intake select{min-height:36px;padding:6px 10px;font:inherit;font-size:14px;color:var(--ink);border:1px solid #b9bec5;border-radius:6px;background:#fff}
+#intake .wide{grid-column:1/-1}
+#intake .presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+#intake .presets button{min-height:28px;padding:2px 10px;font-size:12.5px}
+#breakbox{font-size:13px;text-align:right;margin-bottom:6px}
+.right{display:flex;flex-direction:column;align-items:flex-end}
+#breakbox summary{cursor:pointer;color:var(--muted)}
+#breakbox .bar button{min-height:32px;font-size:12.5px;padding:4px 10px}
+#breakstate{font-size:12px;color:var(--warn);margin-top:4px}
 @media(max-width:800px){main{grid-template-columns:1fr;height:auto}section{min-height:420px}#simbox{text-align:left}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style><header><div class="wrap top"><div><h1>Orange Errand Agent</h1><p class="tagline">Book home services. You approve every step.<span class="demo">Local demo, mock providers</span></p></div><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div></div><main><section><h2>Chat</h2><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
+</style><header><div class="wrap top"><div><h1>Orange Errand Agent</h1><p class="tagline">Book home services. You approve every step.<span class="demo">Local demo, mock providers</span></p></div><div class="right"><details id="breakbox"><summary>Try to break it</summary><div class="bar"><button class="secondary" type="button" data-break="timeout">Next booking: provider times out after booking</button><button class="secondary" type="button" data-break="price">Next hold: price rises by ₹50</button><button class="secondary" type="button" data-break="reviews">Ask about reviews (one holds an injected instruction)</button><button class="secondary" type="button" data-break="normal">Back to normal</button></div><div id="breakstate"></div></details><div id="simbox" hidden><button id="simcancel" class="secondary" type="button">Pretend the provider cancels my booking</button><div class="cap">Demo only: pretends your provider cancelled, so you can watch the assistant react without being asked.</div></div></div></div></header><div class="how"><div class="wrap">How this works: 1 Tell me what you need · 2 Pick a provider and time · 3 You approve · 4 Done. I never book without your yes.</div></div><main><section><h2>Chat</h2><details id="intakebox"><summary>What do you need? Start with a short form</summary><form id="intake"><label>Service<input id="f-service" list="dl-service" required placeholder="Plumber"></label><label>Area<input id="f-area" list="dl-area" required placeholder="Indiranagar"></label><label>Day<select id="f-day"><option value="0">Today</option><option value="1" selected>Tomorrow</option><option value="pick">Pick a date</option></select></label><label>Time of day<select id="f-window"><option value="">Any time</option><option value="mornings only">Mornings only</option><option value="afternoons only">Afternoons only</option><option value="evenings only">Evenings only</option></select></label><label id="f-date-wrap" hidden>Date<input id="f-date" type="date"></label><label class="wide">Budget (₹)<input id="f-budget" type="number" min="1" max="100000" step="1" required placeholder="1500"></label><div class="presets wide" aria-label="Budget presets"><button type="button" class="secondary" data-budget="1000">₹1,000</button><button type="button" class="secondary" data-budget="1500">₹1,500</button><button type="button" class="secondary" data-budget="2000">₹2,000</button><button type="button" class="secondary" data-budget="3000">₹3,000</button></div><label class="wide">Details (optional)<input id="f-notes" type="text" placeholder="Kitchen tap is leaking"></label><div class="wide"><button id="f-go">Find options</button></div><datalist id="dl-service"><option value="Plumber"><option value="Electrician"><option value="AC servicing"></datalist><datalist id="dl-area"><option value="Indiranagar"><option value="Koramangala"><option value="JP Nagar"></datalist></form></details><div id="chat" class="body" aria-live="polite"></div><div id="bookings" hidden aria-label="Your bookings"></div><div id="actions" class="actions approval-card" hidden><div id="proposal"></div><div class="bar"><button id="approve">Yes, book it</button><button id="deny" class="secondary">No, don't</button></div></div><form id="form"><input type="text" id="message" aria-label="Your message" placeholder="Find a plumber this Friday morning under ₹1,500" required><button>Send</button></form></section><section><h2>What the assistant is doing</h2><div class="legend">SAFETY = a guardrail acted · APPROVAL = needs your yes · VERIFY = checked · UNCERTAIN = not known yet</div><div class="legend"><label><input type="checkbox" id="tech"> Show technical detail</label></div><div id="runsum" class="legend">Last run: waiting</div><div id="trace" class="body" aria-live="polite"></div></section></main>
 <script>
 let pending=null;const chat=document.getElementById('chat'),trace=document.getElementById('trace'),actions=document.getElementById('actions'),tech=document.getElementById('tech');
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -95,9 +108,7 @@ function clearChoices(){for(const n of chat.querySelectorAll('.choices'))n.remov
 function chipBox(){clearChoices();const d=el('div','','choices');chat.append(d);return d}
 function chip(box,label,onclick){const b=el('button',label,'secondary');b.type='button';b.onclick=()=>{clearChoices();onclick()};box.append(b)}
 function send(text){bubble(text,'you');return run('/chat',{text},'Thinking…')}
-const STARTS=['Plumber for a leaking tap, tomorrow morning, under ₹1,500 in Indiranagar','Electrician to fix a tripping switchboard, today evening, under ₹2,000 in Koramangala','AC servicing for 2 split ACs, tomorrow, under ₹2,000 in JP Nagar'];
 const MISSING={area:['Area',[['Indiranagar','Indiranagar'],['Koramangala','Koramangala'],['JP Nagar','JP Nagar']]],date_range:['Date',[['Today','today'],['Tomorrow','tomorrow']]],budget:['Budget',[['₹1,000','₹1,000'],['₹1,500','₹1,500'],['₹2,000','₹2,000']]],service:['Service',[['Plumber','plumber'],['Electrician','electrician'],['AC servicing','AC servicing']]]};
-function startChips(){const box=chipBox();for(const t of STARTS)chip(box,t,()=>send(t))}
 function missingChips(missing){const box=chipBox();for(const key of missing){const m=MISSING[key==='date'?'date_range':key];if(!m)continue;for(const [label,value] of m[1])chip(box,label,()=>send(m[0]+': '+value))}}
 function optionCards(options){const box=chipBox();for(const o of options){const card=el('div','','card');card.append(el('b',o.name),el('div','Rating '+o.rating+' · ₹'+o.price));for(const s of o.slots){const b=el('button',s.label);b.type='button';b.onclick=()=>{clearChoices();run('/select',{provider_id:o.provider_id,slot:s.value},'Thinking…')};card.append(b)}box.append(card)}}
 const RED=new Set(['run_error','model_error','web_error','not_approved','status_error']),SKIP=new Set(['event','action_id']);
@@ -106,6 +117,7 @@ function plain(i){const a=i.arguments||{},r=i.result;switch(i.event){
 case 'tool_call':if(i.tool==='update_request'){const p=[a.service,a.area,a.date_range,a.budget?'up to ₹'+a.budget:null].filter(Boolean);return T('AI','Understood your request: '+p.join(' · '))}if(i.tool==='get_provider')return T('PROVIDER','Read reviews of '+friendly(a.provider_id));return null;
 case 'tool_result':if(i.tool==='search_providers')return T('PROVIDER','Searched and found '+(Array.isArray(r)?r.length:0)+' providers');if(i.tool==='hold_slot')return T('PROVIDER','Held the slot for 10 minutes at ₹'+(r&&r.price));return null;
 case 'review_flagged':return T('SAFETY',"Flagged a risky review and ignored it: '"+i.excerpt+"'",'amber');
+case 'price_changed':return T('PRICE','Price changed at hold time: was ₹'+i.was+', now ₹'+i.now+'. Your approval covers the new price.','amber');
 case 'select_clicked':return T('YOU','You picked '+friendly(i.provider_id)+' at '+readableTimes(i.slot));
 case 'proposed':return null;
 case 'approved':return T('YOU','You approved','green');
@@ -134,6 +146,7 @@ const box=document.getElementById('proposal'),rows=[['Provider',friendly(q.provi
 box.replaceChildren(el('h3',wait?'Waiting for the provider. Check the booking status.':p.kind==='replacement'?'Your booking was cancelled. Approve a replacement?':w[0]));
 if(p.replaces)box.append(el('div','Replaces your cancelled booking: '+friendly(p.replaces.provider)+', '+p.replaces.slot_label,'note'));
 for(const [l,v] of rows){const r=el('div','','rrow');r.append(el('span',l,'lbl'),el('span',v,'val'));box.append(r)}
+{const pc=[...lastItems].reverse().find(i=>i.event==='price_changed'&&i.provider_id===q.provider_id&&i.slot===q.slot&&i.now===q.price);if(pc&&!wait)box.append(el('div','Price changed from ₹'+pc.was+' to ₹'+pc.now+' since the options list. Check it before you approve.','hl'))}
 if(!wait)box.append(el('p','Nothing is booked until you click Yes.','note'));
 document.getElementById('approve').textContent=wait?'Check booking status':p.kind==='replacement'&&q.action==='book'?'Yes, book the replacement':w[1];document.getElementById('deny').hidden=wait;actions.hidden=false;renderBookings()}
 async function syncPending(){renderPending(await (await fetch('/pending')).json())}
@@ -144,11 +157,21 @@ async function show(result){clearChoices();const msg=result.message||result.erro
 if(st==='confirmed'&&curProposal&&curProposal.action==='book'){let items=lastItems;try{items=await (await fetch('/trace')).json()}catch(e){}confirmCard(curProposal,items);log.push(['agent','Booking confirmed: '+friendly(curProposal.provider_id)+', '+curProposal.slot_label+', ₹'+curProposal.price]);store()}
 else if(result.options&&result.options.length){const lbl=String(result.options[0].slots&&result.options[0].slots[0]?result.options[0].slots[0].label:'');bubble('Here are '+result.options.length+' options'+(lbl?' for '+lbl.split(',')[0]:'')+'. Pick a time.','agent')}
 else if(!(st==='approval_required'&&result.action_id&&/^(Approve |Pending |Your .* booking was cancelled\. Approve)/.test(msg)))bubble(SENT[st]||msg,'agent');
-if(result.options&&result.options.length)optionCards(result.options);else if(result.missing&&result.missing.length)missingChips(result.missing);syncPending();refresh()}
+if(result.options&&result.options.length)optionCards(result.options);else if(result.missing&&result.missing.length)missingChips(result.missing);refresh().then(syncPending)}
+const intakeBox=document.getElementById('intakebox'),pad=n=>String(n).padStart(2,'0');
+function isoDay(offset){const d=new Date();d.setDate(d.getDate()+offset);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+document.getElementById('f-day').onchange=e=>{document.getElementById('f-date-wrap').hidden=e.target.value!=='pick'};
+for(const b of document.querySelectorAll('[data-budget]'))b.onclick=()=>{document.getElementById('f-budget').value=b.dataset.budget};
+document.getElementById('intake').onsubmit=e=>{e.preventDefault();const v=id=>document.getElementById(id).value.trim(),day=v('f-day'),date=day==='pick'?v('f-date'):isoDay(+day);if(!date){document.getElementById('f-date').focus();return}
+const text=v('f-service')+' in '+v('f-area')+' on '+date+(v('f-window')?', '+v('f-window'):'')+', under ₹'+v('f-budget')+'.'+(v('f-notes')?' Details: '+v('f-notes')+'.':'');intakeBox.open=false;send(text)};
+const BREAK_NOTE={timeout:'Next booking: the provider will book it but the reply will be lost.',price:'Next hold: the quoted price will be ₹50 higher than the search price.',normal:''};
+for(const b of document.querySelectorAll('[data-break]'))b.onclick=async()=>{const kind=b.dataset.break;if(kind==='reviews'){send('Before I choose, read the reviews of the providers you found and tell me if anything looks off.');return}
+let out;try{out=await (await fetch('/break',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind})})).json()}catch(e){out={}}
+document.getElementById('breakstate').textContent=out.status==='ok'?BREAK_NOTE[kind]:'Could not change the mode.'};
 document.getElementById('form').onsubmit=async e=>{e.preventDefault();const input=document.getElementById('message'),value=input.value.trim();if(!value)return;input.value='';send(value)};
 for(const [id,approved] of [['approve',true],['deny',false]])document.getElementById(id).onclick=()=>{if(pending)run('/approve',{action_id:pending,approved},'Working on it…')};
 document.getElementById('simcancel').onclick=()=>run('/simulate-provider-cancel',{},'Working on it…');
-restoreChat();refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(!p.action_id&&!chat.children.length)startChips()});poll(3000);
+restoreChat();refresh();fetch('/pending').then(r=>r.json()).then(p=>{renderPending(p);if(!p.action_id&&!chat.children.length)intakeBox.open=true});poll(3000);
 </script></html>"""
 
 
@@ -249,7 +272,7 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                 return self.send(400, {"error": "invalid Content-Length"})
             if size < 1 or size > 24000:
                 return self.send(413, {"error": "request too large"})
-            if self.path not in {"/chat", "/select", "/approve", "/simulate-provider-cancel"}:
+            if self.path not in {"/chat", "/select", "/approve", "/simulate-provider-cancel", "/break"}:
                 return self.send(404, {"error": "not found"})
             try:
                 raw = self.rfile.read(size)  # read before taking the lock: a stalled client must not block others
@@ -280,6 +303,18 @@ def create_server(root: Path, *, scripted=False, scenario="timeout_success", por
                         return self.send(403, {"error": "no matching pending action"})
                     result = agent.confirm(pending["action_id"], data["approved"])
                     pending["action_id"] = result.get("action_id") if result.get("status") == "approval_required" else None
+                elif self.path == "/break":
+                    # Demo switches for the provider mock only; approval and verification code are untouched.
+                    kind = data.get("kind")
+                    if kind == "timeout":
+                        provider.scenario = "timeout_success"
+                    elif kind == "price":
+                        provider.quote_delta = 50
+                    elif kind == "normal":
+                        provider.scenario, provider.quote_delta = "success", 0
+                    else:
+                        return self.send(400, {"error": "unknown kind"})
+                    result = {"status": "ok", "kind": kind}
                 elif self.path == "/simulate-provider-cancel":
                     if pending["action_id"] and dispatcher.status(pending["action_id"]) in {"proposed", "pending"}:
                         return self.send(409, {"error": "resolve the pending action first"})
