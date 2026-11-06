@@ -71,5 +71,7 @@ Before sharing this folder, remove `.env` or share the repository with `git clon
 - The page keeps its "pending approval" pointer in server memory and restores it from the database on reload; it is built for one browser tab.
 - Live-model replies take about 10–20 seconds because the model makes several tool calls in turn.
 - Model picks can still vary between runs; code checks every tool argument, so a wrong pick is blocked or asks again rather than booking.
+- Free-form model text is screened for claim words, prices and clock times, and then replaced by code-written text; it can still misstate a detail outside those patterns (a weekday, provider name or area). Anything that books, and every approval card and confirmation, comes from the ledger, not from model prose.
+- The "price" demo button shows a higher quote at hold time that needs fresh approval. A changed proposal after approval is rejected by the gate (tests/test_gate.py), but the page cannot trigger that case.
 - Cost figures are estimates from assumed per-token rates.
 - `errand/agent.py` is the largest file (about 530 lines; one 178-line method runs the chat loop). A split into tools, prompt, validation and approval modules is planned but deliberately not done before submission, because the tests, evals, fuzz report and recorded cassette all pin its behaviour.
