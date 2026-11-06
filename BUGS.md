@@ -124,3 +124,10 @@ Offline scenarios use a scripted model, so these only appeared with Claude in th
 - **Cause:** the prompt told the model to use `list_bookings` for "my booking", but not that moving or cancelling something it already has is a different path from a new request. `update_request` with missing facts ends the run early. The reschedule slot was never validated.
 - **Fix:** the prompt says to call `list_bookings` first and then `reschedule` or `cancel`, and to turn a weekday into a `YYYY-MM-DD` date. A reschedule time must now contain a date and `HH:MM`; anything else is blocked before any proposal, and it is normalised to the provider's zone.
 - **Regression:** eval `recorded_reschedule_ac` (the real conversation replayed offline) and `tests/test_post_booking.py::test_reschedule_with_an_unparseable_time_is_blocked_before_any_proposal`. A first live attempt after the fix hit the 30-second run limit on a slow API call and was reported as limit_reached with nothing booked; the next attempt completed.
+
+## 26. After a review question the assistant lost the options and gave a non-answer
+
+- **Observed:** found while rehearsing the recorded demo with the live model. Choosing "Ask about reviews" (one review holds an injected instruction) produced "I have the request details. I can search providers when you're ready." and the option cards disappeared, so the next step (pick a time) could not be done.
+- **Cause:** a run that read provider reviews is provider-influenced, so the agent never lets the model's free text through. The only remaining branch was the generic "request details" fallback, which neither answered the question nor re-attached the options in `state["candidates"]`.
+- **Fix:** when candidates exist and the run read reviews, the reply is written by code ("I read the provider reviews. One review contained an instruction aimed at me. I ignored it…" or "My check flagged nothing unusual in them.") and the options are returned again. Review text is never repeated.
+- **Regression:** `tests/test_agent_behaviors.py::test_review_question_keeps_options_and_answers_from_code`.

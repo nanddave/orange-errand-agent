@@ -289,6 +289,7 @@ class ChatAgent:
         )}]
         tool_calls = 0
         saw_provider_data = False
+        flagged_review = False
         searched_now = False
         for turn in range(self.max_model_turns):
             if self.clock() - start >= self.max_seconds:
@@ -337,6 +338,13 @@ class ChatAgent:
                     summary = self._bookings_summary(user_id) if (tool_calls == 0 or CLAIM.search(reply)) else ""
                     if summary:
                         return self._result(user_id, facts, history, state, "ready", summary)
+                    if candidates and saw_provider_data:
+                        # Reviews are untrusted, so the answer is code-owned; the options stay on screen so the user can still pick.
+                        note = ("One review contained an instruction aimed at me. I ignored it; it changes nothing about your request."
+                                if flagged_review else "My check flagged nothing unusual in them.")
+                        return self._result(user_id, facts, history, state, "ready",
+                                            f"I read the provider reviews. {note} Your options are below. No booking has been made.",
+                                            options=_options(state))
                     message = "I have the request details. I can search providers when you're ready. No booking has been made."
                 return self._result(user_id, facts, history, state, "ready", message)
             tool_calls += 1
@@ -428,6 +436,7 @@ class ChatAgent:
                 # Observability only: enforcement stays in code (saw_provider_data blocks and the approval gate).
                 for review in result.get("reviews", []):
                     if INSTRUCTION_LIKE.search(review):
+                        flagged_review = True
                         self.dispatcher._log("review_flagged", "", provider_id=args["provider_id"], excerpt=review[:120],
                                              reason="instruction-like text in untrusted review")
             elif name == "hold_slot":
