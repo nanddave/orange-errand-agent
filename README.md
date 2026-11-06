@@ -6,8 +6,8 @@ Local, single-agent home-service booking demo for the Orange engineering assignm
 
 1. `./proof.sh` runs the tests, all offline evals and 500 seeded fault-injection runs, and prints one summary line each.
 2. Watch the 3½-minute screen recording, [demo/orange-errand-demo.mp4](demo/orange-errand-demo.mp4): one full booking with a prompt-injection review, a timeout after success, and a provider cancellation, chat and trace side by side. Claude is live in it; the providers are mock services. Then read [DESIGN_NOTE.md](DESIGN_NOTE.md) (one page) and the raw real-model run in [TIMEOUT_TRACE_LIVE.txt](TIMEOUT_TRACE_LIVE.txt).
-3. Evidence index: [EVAL_TABLE.md](EVAL_TABLE.md) (generated), [FUZZ_REPORT.md](FUZZ_REPORT.md) (generated), [BUGS.md](BUGS.md) (reproduced bugs with regression tests), [cassettes/](cassettes/) (real Claude conversations replayed offline: a booking with a timeout, "Move my AC servicing to Saturday", "same electrician as last time, not before 10 a.m.").
-4. Limits: the fuzz exercises the mock provider's failure modes with scripted model actions, not production traffic; real-model variability is covered by the recorded cassettes and `BUGS.md` entries 9 and 16–18, not at scale.
+3. Evidence index: [EVAL_TABLE.md](EVAL_TABLE.md) (generated), [FUZZ_REPORT.md](FUZZ_REPORT.md) (generated), [BUGS.md](BUGS.md) (reproduced bugs with regression tests), [cassettes/](cassettes/) (real Claude conversations replayed offline: a booking with a timeout, "Move my AC servicing to Saturday", "same electrician as last time, not before 10 a.m."), and [the redacted AI transcript](transcripts/pilot/claude_d1a78247.md).
+4. Limits: the fuzz exercises the mock provider's failure modes with scripted model actions, not production traffic; real-model variability is covered by the recorded cassettes, the reproduced issues in `BUGS.md`, and optional `tests/live_probe.py` checks, not at scale.
 
 ## Run locally
 
@@ -63,7 +63,7 @@ Before sharing this folder, remove `.env` or share the repository with `git clon
 
 ## No API key? Run it offline
 
-`python -m errand.web --scripted --port 8766` runs the whole page with a scripted model and the same approval and booking code, so reviewers can try it without a key. `.env.example` shows the live-model setting. `pytest` and the evals never call the API.
+`python -m errand.web --scripted --port 8766` runs the page with a fixed plumbing-booking fixture and the same approval and booking code, so reviewers can check the interface and safety path without a key. It does not interpret arbitrary chat; run without `--scripted` for the live free-form model. `.env.example` shows the live-model setting. `pytest` and the evals never call the API.
 
 ## Known limits
 

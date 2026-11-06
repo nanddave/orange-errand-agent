@@ -1,6 +1,6 @@
 # Orange Errand Agent — project initiation document
 
-**Status:** Implementation complete on 7 November 2026: 172 tests and 53 offline evals pass; 500 seeded fuzz runs reported 0 violations. A real-model timeout-after-success trace is saved as `TIMEOUT_TRACE_LIVE.txt`. The recorded demo is committed at `demo/orange-errand-demo.mp4` (3:31, 1080p, live model, mock providers). Transcript assembly remains open; the workspace currently contains a pilot transcript for one Claude Code session. Video hosting and final submission also remain open. No submission has begun.
+**Status:** Implementation complete on 7 November 2026: 188 tests and 53 offline evals pass; 500 seeded fuzz runs reported 0 violations. A real-model timeout-after-success trace is saved as `TIMEOUT_TRACE_LIVE.txt`. The recorded demo is committed at `demo/orange-errand-demo.mp4` (3:31, 1080p, live model, mock providers). A redacted AI transcript is included at `transcripts/pilot/claude_d1a78247.md`. Video hosting and final submission remain open. No submission has begun.
 **Source of truth:** [Orange_Engineering_Assignment.pdf](/Users/nanddave/Downloads/Orange_Engineering_Assignment.pdf), three pages. The hiring email deadline is 7 November, 11:30 AM IST (confirmed by the user on 5 November 2026).
 **Objective:** Build a locally runnable, chat-based home-service agent that uses a real LLM, mock providers, explicit approval, and verified recovery from uncertain tool outcomes. Supply the exact evidence requested in the PDF.
 
