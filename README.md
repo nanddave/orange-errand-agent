@@ -5,7 +5,7 @@ Local, single-agent home-service booking demo for the Orange engineering assignm
 ## Reviewer path (about 60 seconds)
 
 1. `./proof.sh` runs the tests, all offline evals and 500 seeded fault-injection runs, and prints one summary line each.
-2. Read [DESIGN_NOTE.md](DESIGN_NOTE.md) (one page) and the raw real-model run in [TIMEOUT_TRACE_LIVE.txt](TIMEOUT_TRACE_LIVE.txt).
+2. Watch the 3½-minute screen recording, [demo/orange-errand-demo.mp4](demo/orange-errand-demo.mp4): one full booking with a prompt-injection review, a timeout after success, and a provider cancellation, chat and trace side by side. Claude is live in it; the providers are mock services. Then read [DESIGN_NOTE.md](DESIGN_NOTE.md) (one page) and the raw real-model run in [TIMEOUT_TRACE_LIVE.txt](TIMEOUT_TRACE_LIVE.txt).
 3. Evidence index: [EVAL_TABLE.md](EVAL_TABLE.md) (generated), [FUZZ_REPORT.md](FUZZ_REPORT.md) (generated), [BUGS.md](BUGS.md) (reproduced bugs with regression tests), [cassettes/](cassettes/) (real Claude conversations replayed offline: a booking with a timeout, "Move my AC servicing to Saturday", "same electrician as last time, not before 10 a.m.").
 4. Limits: the fuzz exercises the mock provider's failure modes with scripted model actions, not production traffic; real-model variability is covered by the recorded cassettes and `BUGS.md` entries 9 and 16–18, not at scale.
 
